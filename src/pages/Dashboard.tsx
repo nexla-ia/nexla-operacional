@@ -19,8 +19,7 @@ import Mensalidades from '../components/cadastros/Mensalidades'
 import EntradasProjetos from '../components/cadastros/EntradasProjetos'
 import Cobranca from '../components/Cobranca'
 import type { User } from '@supabase/supabase-js'
-import type { Column, Project } from '../lib/types'
-import { uid } from '../lib/utils'
+import type { Project } from '../lib/types'
 
 // ── Nav types ─────────────────────────────────────────────────────────────────
 
@@ -67,12 +66,6 @@ const SECTION_LABELS: Record<string, string> = {
   despesas: 'Despesas', mensalidades: 'Mensalidades', entradas: 'Entradas de Projetos',
 }
 
-const INITIAL_COLUMNS: Column[] = [
-  { id: 'todo',  title: 'A Fazer',      tasks: [] },
-  { id: 'doing', title: 'Em Andamento', tasks: [] },
-  { id: 'done',  title: 'Concluída',    tasks: [] },
-]
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -81,7 +74,7 @@ export default function Dashboard() {
   const [activeSection, setActiveSection] = useState('kanban')
   const [sidebarOpen, setSidebarOpen]     = useState(false)
   const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['cadastros']))
-  const [columns, setColumns]             = useState<Column[]>(INITIAL_COLUMNS)
+  const [pendingKanbanTask, setPendingKanbanTask] = useState<{ title: string; subtitle?: string } | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -93,11 +86,10 @@ export default function Dashboard() {
   async function handleLogout() { await signOut(); navigate('/') }
 
   function handleProjectCreated(project: Project) {
-    setColumns(cols => cols.map(c =>
-      c.id === 'todo'
-        ? { ...c, tasks: [...c.tasks, { id: uid(), title: project.nome_projeto, subtitle: project.nome_cliente || undefined, fromProject: true }] }
-        : c
-    ))
+    setPendingKanbanTask({
+      title: project.nome_projeto,
+      subtitle: project.nome_cliente || undefined,
+    })
   }
 
   function toggleGroup(id: string) {
@@ -220,7 +212,7 @@ export default function Dashboard() {
             style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px)', backgroundSize: '48px 48px' }} />
 
           <div className="relative z-10 animate-fade-in-up h-full">
-            {activeSection === 'kanban'       && <KanbanBoard columns={columns} setColumns={setColumns} />}
+            {activeSection === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
             {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} />}
             {activeSection === 'cobranca'     && <Cobranca />}
             {activeSection === 'clientes'     && <Clientes />}

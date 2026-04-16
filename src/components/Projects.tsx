@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Plus, Pencil, Trash2, X, FolderKanban, Calendar, DollarSign, User, Hash, ChevronDown } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Pencil, Trash2, X, FolderKanban, Calendar, DollarSign, User, Phone } from 'lucide-react'
 
 interface Project {
   id: string
@@ -12,29 +12,9 @@ interface Project {
   descricao: string
 }
 
-const TIPOS = [
-  { value: 'web',         label: 'Web' },
-  { value: 'mobile',      label: 'Mobile' },
-  { value: 'desktop',     label: 'Desktop' },
-  { value: 'api',         label: 'API / Backend' },
-  { value: 'consultoria', label: 'Consultoria' },
-  { value: 'design',      label: 'Design' },
-  { value: 'outro',       label: 'Outro' },
-]
-
-const TIPO_BADGE: Record<string, string> = {
-  web:         'bg-blue-500/15 text-blue-300 ring-blue-500/20',
-  mobile:      'bg-violet-500/15 text-violet-300 ring-violet-500/20',
-  desktop:     'bg-indigo-500/15 text-indigo-300 ring-indigo-500/20',
-  api:         'bg-cyan-500/15 text-cyan-300 ring-cyan-500/20',
-  consultoria: 'bg-amber-500/15 text-amber-300 ring-amber-500/20',
-  design:      'bg-pink-500/15 text-pink-300 ring-pink-500/20',
-  outro:       'bg-slate-500/15 text-slate-300 ring-slate-500/20',
-}
-
 const EMPTY: Omit<Project, 'id'> = {
   nome_projeto:   '',
-  tipo_projeto:   'web',
+  tipo_projeto:   '',
   nome_cliente:   '',
   numero_cliente: '',
   valor:          '',
@@ -42,113 +22,7 @@ const EMPTY: Omit<Project, 'id'> = {
   descricao:      '',
 }
 
-// ── ComboSelect ───────────────────────────────────────────────────────────────
-// Dropdown totalmente customizado: digita livremente ou escolhe da lista.
 
-interface ComboSelectProps {
-  value: string
-  onChange: (v: string) => void
-  options: { value: string; label: string }[]
-  placeholder?: string
-  className?: string
-}
-
-function ComboSelect({ value, onChange, options, placeholder, className = '' }: ComboSelectProps) {
-  const [open, setOpen]   = useState(false)
-  const [query, setQuery] = useState('')
-  const ref               = useRef<HTMLDivElement>(null)
-
-  const currentLabel = options.find(o => o.value === value)?.label ?? value
-
-  const filtered = query
-    ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
-    : options
-
-  // Fecha ao clicar fora
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-        setQuery('')
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  function select(val: string) {
-    onChange(val)
-    setOpen(false)
-    setQuery('')
-  }
-
-  function handleKey(e: React.KeyboardEvent) {
-    if (e.key === 'Escape') { setOpen(false); setQuery('') }
-    if (e.key === 'Enter' && query.trim()) {
-      // Se digitou algo que não bate com nenhuma opção, usa como valor livre
-      const match = filtered[0]
-      if (match) select(match.value)
-      else { onChange(query.trim()); setOpen(false); setQuery('') }
-    }
-  }
-
-  return (
-    <div ref={ref} className={`relative ${className}`}>
-      <button
-        type="button"
-        onClick={() => { setOpen(o => !o); setQuery('') }}
-        className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl
-                   bg-white/5 border border-white/10 text-white text-sm text-left
-                   hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
-                   focus:border-indigo-500/40 transition-all duration-200"
-      >
-        <span className={currentLabel ? 'text-white' : 'text-slate-500'}>
-          {currentLabel || placeholder}
-        </span>
-        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="absolute z-50 mt-1.5 w-full rounded-xl bg-slate-800 border border-white/[0.10]
-                        shadow-2xl shadow-black/60 overflow-hidden">
-          {/* Input de busca */}
-          <div className="p-2 border-b border-white/[0.07]">
-            <input
-              autoFocus
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder="Buscar ou digitar…"
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm
-                         placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
-            />
-          </div>
-
-          {/* Lista */}
-          <ul className="max-h-48 overflow-y-auto py-1">
-            {filtered.length === 0 ? (
-              <li className="px-4 py-2.5 text-slate-500 text-sm">Nenhum resultado</li>
-            ) : (
-              filtered.map(opt => (
-                <li
-                  key={opt.value}
-                  onClick={() => select(opt.value)}
-                  className={`px-4 py-2.5 text-sm cursor-pointer transition-colors
-                    ${value === opt.value
-                      ? 'bg-indigo-500/20 text-indigo-300'
-                      : 'text-slate-300 hover:bg-white/[0.06] hover:text-white'
-                    }`}
-                >
-                  {opt.label}
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -240,11 +114,11 @@ function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
             </div>
             <div>
               <label className={labelCls}>Tipo de Projeto</label>
-              <ComboSelect
+              <input
+                className={inputCls}
+                placeholder="Ex: Web, Mobile, Design…"
                 value={form.tipo_projeto}
-                onChange={v => set('tipo_projeto', v)}
-                options={TIPOS}
-                placeholder="Selecione ou digite…"
+                onChange={e => set('tipo_projeto', e.target.value)}
               />
             </div>
           </div>
@@ -261,10 +135,11 @@ function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
               />
             </div>
             <div>
-              <label className={labelCls}>Número do Cliente</label>
+              <label className={labelCls}>Telefone do Cliente</label>
               <input
+                type="tel"
                 className={inputCls}
-                placeholder="Ex: 00123"
+                placeholder="Ex: (11) 99999-9999"
                 value={form.numero_cliente}
                 onChange={e => set('numero_cliente', e.target.value)}
               />
@@ -343,7 +218,7 @@ interface CardProps {
 
 function ProjectCard({ project, onEdit, onDelete }: CardProps) {
   const badge = TIPO_BADGE[project.tipo_projeto] ?? TIPO_BADGE.outro
-  const tipoLabel = TIPOS.find(t => t.value === project.tipo_projeto)?.label ?? project.tipo_projeto
+  const tipoLabel = project.tipo_projeto
 
   return (
     <div className="group flex flex-col gap-4 p-5 rounded-2xl bg-slate-900/70 border border-white/[0.07]
@@ -366,7 +241,7 @@ function ProjectCard({ project, onEdit, onDelete }: CardProps) {
       <div className="grid grid-cols-2 gap-2.5">
         {project.numero_cliente && (
           <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-            <Hash className="w-3 h-3 shrink-0 text-slate-600" />
+            <Phone className="w-3 h-3 shrink-0 text-slate-600" />
             <span className="truncate">{project.numero_cliente}</span>
           </div>
         )}

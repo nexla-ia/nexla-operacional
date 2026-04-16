@@ -1,13 +1,23 @@
+import { useEffect, useState } from 'react'
 import { LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { signOut, getUser } from '../lib/auth'
+import { signOut } from '../lib/auth'
+import { supabase } from '../lib/supabase'
+import type { User } from '@supabase/supabase-js'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const user = getUser()
+  const [user, setUser] = useState<User | null>(null)
 
-  function handleLogout() {
-    signOut()
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) navigate('/')
+      else setUser(data.user)
+    })
+  }, [navigate])
+
+  async function handleLogout() {
+    await signOut()
     navigate('/')
   }
 

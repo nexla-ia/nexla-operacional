@@ -153,25 +153,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Separador */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-white/[0.07]" />
-            <span className="text-xs text-slate-600 font-medium uppercase tracking-widest">Acesso demo</span>
-            <div className="flex-1 h-px bg-white/[0.07]" />
-          </div>
-
-          {/* Credenciais de teste */}
-          <button
-            type="button"
-            onClick={() => { setEmail('admin@nexla.com'); setPassword('123456') }}
-            className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.06] hover:border-white/[0.12] transition-all duration-200 text-center group"
-          >
-            <span className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors font-mono">
-              admin@nexla.com
-              <span className="mx-2 text-slate-700">/</span>
-              123456
-            </span>
-          </button>
         </div>
 
         <p className="text-center text-xs text-slate-700 mt-6">

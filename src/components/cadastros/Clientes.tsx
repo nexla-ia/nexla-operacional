@@ -1,0 +1,208 @@
+import { useState, useEffect } from 'react'
+import { Plus, Pencil, Trash2, X, Users, Loader2, Phone, Mail, FileText } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
+import type { Client } from '../../lib/types'
+
+const EMPTY: Omit<Client, 'id'> = {
+  nome: '', email: '', telefone: '', cpf_cnpj: '',
+  tipo: 'PF', cidade: '', estado: '', observacoes: '',
+}
+
+const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
+
+const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
+  placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
+  focus:border-indigo-500/40 transition-all hover:border-white/20`
+const labelCls = 'block text-xs font-medium text-slate-400 mb-1.5'
+
+function fromDB(r: Record<string, unknown>): Client {
+  return {
+    id: r.id as string, nome: (r.nome as string) ?? '',
+    email: (r.email as string) ?? '', telefone: (r.telefone as string) ?? '',
+    cpf_cnpj: (r.cpf_cnpj as string) ?? '', tipo: (r.tipo as 'PF' | 'PJ') ?? 'PF',
+    cidade: (r.cidade as string) ?? '', estado: (r.estado as string) ?? '',
+    observacoes: (r.observacoes as string) ?? '',
+  }
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+function ClientModal({ initial, editing, onSave, onClose }: {
+  initial: Omit<Client, 'id'>
+  editing: boolean
+  onSave: (d: Omit<Client, 'id'>) => Promise<void>
+  onClose: () => void
+}) {
+  const [form, setForm] = useState(initial)
+  const [saving, setSaving] = useState(false)
+  const set = (k: keyof Omit<Client, 'id'>, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    await onSave(form)
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-2xl bg-slate-900 border border-white/[0.09] rounded-3xl shadow-2xl shadow-black/60 overflow-hidden animate-fade-in-up">
+        <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.07]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/15 ring-1 ring-indigo-500/25 flex items-center justify-center">
+              <Users className="w-4 h-4 text-indigo-400" />
+            </div>
+            <h2 className="text-white font-semibold text-base">{editing ? 'Editar Cliente' : 'Novo Cliente'}</h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.07] transition-colors"><X className="w-4 h-4" /></button>
+        </div>
+        <form onSubmit={submit} className="px-7 py-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* Tipo */}
+          <div className="flex gap-3">
+            {(['PF', 'PJ'] as const).map(t => (
+              <button key={t} type="button" onClick={() => set('tipo', t)}
+                className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all
+                  ${form.tipo === t ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/20'}`}>
+                {t === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+              </button>
+            ))}
+          </div>
+          {/* Nome | CPF/CNPJ */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className={labelCls}>Nome *</label>
+              <input className={inputCls} placeholder="Nome completo ou razão social" value={form.nome} onChange={e => set('nome', e.target.value)} required /></div>
+            <div><label className={labelCls}>{form.tipo === 'PF' ? 'CPF' : 'CNPJ'}</label>
+              <input className={inputCls} placeholder={form.tipo === 'PF' ? '000.000.000-00' : '00.000.000/0001-00'} value={form.cpf_cnpj} onChange={e => set('cpf_cnpj', e.target.value)} /></div>
+          </div>
+          {/* Email | Telefone */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className={labelCls}>E-mail</label>
+              <input type="email" className={inputCls} placeholder="email@exemplo.com" value={form.email} onChange={e => set('email', e.target.value)} /></div>
+            <div><label className={labelCls}>Telefone</label>
+              <input type="tel" className={inputCls} placeholder="(11) 99999-9999" value={form.telefone} onChange={e => set('telefone', e.target.value)} /></div>
+          </div>
+          {/* Cidade | Estado */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="col-span-2"><label className={labelCls}>Cidade</label>
+              <input className={inputCls} placeholder="São Paulo" value={form.cidade} onChange={e => set('cidade', e.target.value)} /></div>
+            <div><label className={labelCls}>Estado</label>
+              <select className={inputCls + ' cursor-pointer'} value={form.estado} onChange={e => set('estado', e.target.value)} style={{ colorScheme: 'dark' }}>
+                <option value="">UF</option>
+                {ESTADOS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+              </select></div>
+          </div>
+          {/* Observações */}
+          <div><label className={labelCls}>Observações</label>
+            <textarea rows={2} className={inputCls + ' resize-none'} placeholder="Notas adicionais…" value={form.observacoes} onChange={e => set('observacoes', e.target.value)} /></div>
+          {/* Ações */}
+          <div className="flex gap-3 pt-1">
+            <button type="submit" disabled={saving}
+              className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/25 disabled:opacity-60 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300">
+              {saving ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Salvando…</span> : editing ? 'Salvar' : 'Criar Cliente'}
+            </button>
+            <button type="button" onClick={onClose} disabled={saving}
+              className="px-5 py-2.5 rounded-xl text-slate-400 text-sm font-medium bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors disabled:opacity-50">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default function Clientes() {
+  const [clients, setClients] = useState<Client[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState('')
+  const [modal, setModal]     = useState(false)
+  const [editId, setEditId]   = useState<string | null>(null)
+  const [initial, setInitial] = useState<Omit<Client, 'id'>>(EMPTY)
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    const { data, error } = await supabase.from('clients').select('*').order('nome')
+    if (error) setError('Erro ao carregar clientes.')
+    else if (data) setClients(data.map(fromDB))
+    setLoading(false)
+  }
+
+  async function handleSave(data: Omit<Client, 'id'>) {
+    setError('')
+    const payload = { nome: data.nome, email: data.email || null, telefone: data.telefone || null,
+      cpf_cnpj: data.cpf_cnpj || null, tipo: data.tipo, cidade: data.cidade || null,
+      estado: data.estado || null, observacoes: data.observacoes || null }
+    if (editId) {
+      const { error } = await supabase.from('clients').update(payload).eq('id', editId)
+      if (error) { setError('Erro ao salvar.'); return }
+      setClients(cs => cs.map(c => c.id === editId ? { ...data, id: editId } : c))
+    } else {
+      const { data: row, error } = await supabase.from('clients').insert(payload).select().single()
+      if (error || !row) { setError('Erro ao criar.'); return }
+      setClients(cs => [...cs, fromDB(row)])
+    }
+    setModal(false)
+  }
+
+  async function del(id: string) {
+    const { error } = await supabase.from('clients').delete().eq('id', id)
+    if (error) { setError('Erro ao excluir.'); return }
+    setClients(cs => cs.filter(c => c.id !== id))
+  }
+
+  function openNew() { setInitial(EMPTY); setEditId(null); setModal(true) }
+  function openEdit(c: Client) { const { id, ...r } = c; setInitial(r); setEditId(id); setModal(true) }
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-white font-bold text-xl">Clientes</h1>
+          <p className="text-slate-500 text-sm mt-0.5">{loading ? 'Carregando…' : `${clients.length} cliente${clients.length !== 1 ? 's' : ''}`}</p>
+        </div>
+        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300">
+          <Plus className="w-4 h-4" />Novo Cliente
+        </button>
+      </div>
+      {error && <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}<button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button></div>}
+      {loading ? (
+        <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 text-indigo-400 animate-spin" /></div>
+      ) : clients.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900/80 ring-1 ring-white/10 flex items-center justify-center mb-4"><Users className="w-6 h-6 text-slate-600" /></div>
+          <p className="text-slate-400 font-medium text-sm">Nenhum cliente cadastrado</p>
+          <p className="text-slate-600 text-xs mt-1">Clique em "Novo Cliente" para começar</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {clients.map(c => (
+            <div key={c.id} className="group flex flex-col gap-3 p-5 rounded-2xl bg-slate-900/70 border border-white/[0.07] hover:border-white/[0.13] backdrop-blur-sm transition-all">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-semibold text-sm truncate">{c.nome}</h3>
+                  {c.cpf_cnpj && <p className="text-slate-500 text-xs mt-0.5">{c.cpf_cnpj}</p>}
+                </div>
+                <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ring-1 ${c.tipo === 'PJ' ? 'bg-violet-500/15 text-violet-300 ring-violet-500/20' : 'bg-blue-500/15 text-blue-300 ring-blue-500/20'}`}>{c.tipo}</span>
+              </div>
+              <div className="space-y-1.5">
+                {c.email && <div className="flex items-center gap-1.5 text-slate-400 text-xs"><Mail className="w-3 h-3 text-slate-600" /><span className="truncate">{c.email}</span></div>}
+                {c.telefone && <div className="flex items-center gap-1.5 text-slate-400 text-xs"><Phone className="w-3 h-3 text-slate-600" /><span>{c.telefone}</span></div>}
+                {(c.cidade || c.estado) && <div className="flex items-center gap-1.5 text-slate-400 text-xs"><FileText className="w-3 h-3 text-slate-600" /><span>{[c.cidade, c.estado].filter(Boolean).join(' — ')}</span></div>}
+              </div>
+              <div className="flex gap-2 pt-1 border-t border-white/[0.05] opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => openEdit(c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 text-xs font-medium transition-colors"><Pencil className="w-3 h-3" />Editar</button>
+                <button onClick={() => del(c.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-xs font-medium transition-colors"><Trash2 className="w-3 h-3" />Excluir</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {modal && <ClientModal initial={initial} editing={!!editId} onSave={handleSave} onClose={() => setModal(false)} />}
+    </>
+  )
+}

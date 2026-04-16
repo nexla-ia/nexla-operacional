@@ -21,3 +21,43 @@ export interface Project {
   data_termino: string
   descricao: string
 }
+
+export interface Client {
+  id: string
+  nome: string
+  email: string
+  telefone: string
+  cpf_cnpj: string
+  tipo: 'PF' | 'PJ'
+  cidade: string
+  estado: string
+  observacoes: string
+}
+
+export interface Expense {
+  id: string
+  descricao: string
+  valor: string
+  data: string
+  categoria: string
+  tipo: 'fixa' | 'avulsa'
+}
+
+export interface Mensalidade {
+  id: string
+  cliente_nome: string
+  descricao: string
+  valor: string
+  dia_vencimento: string
+  status: 'ativo' | 'inativo'
+  data_inicio: string
+}
+
+export interface ProjectEntry {
+  id: string
+  nome_projeto: string
+  descricao: string
+  valor: string
+  data: string
+  status: 'pendente' | 'recebido'
+}

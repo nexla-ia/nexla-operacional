@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, X, FolderKanban, Calendar, DollarSign, User, Phone, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { maskBRL, parseBRL, numToMask, formatDate, maskPhone } from '../lib/utils'
 import type { Project } from '../lib/types'
 
 export type { Project }
@@ -16,33 +17,6 @@ const EMPTY: Omit<Project, 'id'> = {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Máscara BRL: conforme digita → "1.234,56" */
-function maskBRL(raw: string): string {
-  const digits = raw.replace(/\D/g, '')
-  if (!digits) return ''
-  const num = parseInt(digits, 10) / 100
-  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-/** "1.234,56" → 1234.56 para salvar no banco */
-function parseBRL(masked: string): number | null {
-  if (!masked) return null
-  const n = parseFloat(masked.replace(/\./g, '').replace(',', '.'))
-  return isNaN(n) ? null : n
-}
-
-/** Número do banco → "1.234,56" para mostrar no form */
-function numToMask(n: number | null): string {
-  if (n == null) return ''
-  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function formatDate(iso: string) {
-  if (!iso) return ''
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
-}
 
 // ── Mapeamento banco ↔ componente ─────────────────────────────────────────────
 
@@ -175,7 +149,8 @@ function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
                 className={inputCls}
                 placeholder="Ex: (11) 99999-9999"
                 value={form.numero_cliente}
-                onChange={e => set('numero_cliente', e.target.value)}
+                inputMode="numeric"
+                onChange={e => set('numero_cliente', maskPhone(e.target.value))}
               />
             </div>
           </div>

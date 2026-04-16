@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, X, Users, Loader2, Phone, Mail, FileText } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { maskPhone, maskCPF, maskCNPJ } from '../../lib/utils'
 import type { Client } from '../../lib/types'
 
 const EMPTY: Omit<Client, 'id'> = {
@@ -73,14 +74,18 @@ function ClientModal({ initial, editing, onSave, onClose }: {
             <div><label className={labelCls}>Nome *</label>
               <input className={inputCls} placeholder="Nome completo ou razão social" value={form.nome} onChange={e => set('nome', e.target.value)} required /></div>
             <div><label className={labelCls}>{form.tipo === 'PF' ? 'CPF' : 'CNPJ'}</label>
-              <input className={inputCls} placeholder={form.tipo === 'PF' ? '000.000.000-00' : '00.000.000/0001-00'} value={form.cpf_cnpj} onChange={e => set('cpf_cnpj', e.target.value)} /></div>
+              <input className={inputCls} placeholder={form.tipo === 'PF' ? '000.000.000-00' : '00.000.000/0001-00'}
+                value={form.cpf_cnpj} inputMode="numeric"
+                onChange={e => set('cpf_cnpj', form.tipo === 'PF' ? maskCPF(e.target.value) : maskCNPJ(e.target.value))} /></div>
           </div>
           {/* Email | Telefone */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><label className={labelCls}>E-mail</label>
               <input type="email" className={inputCls} placeholder="email@exemplo.com" value={form.email} onChange={e => set('email', e.target.value)} /></div>
             <div><label className={labelCls}>Telefone</label>
-              <input type="tel" className={inputCls} placeholder="(11) 99999-9999" value={form.telefone} onChange={e => set('telefone', e.target.value)} /></div>
+              <input type="tel" className={inputCls} placeholder="(11) 99999-9999"
+                value={form.telefone} inputMode="numeric"
+                onChange={e => set('telefone', maskPhone(e.target.value))} /></div>
           </div>
           {/* Cidade | Estado */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

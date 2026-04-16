@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, X, RefreshCw, Loader2, CheckCircle, PauseCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { maskBRL, parseBRL, numToMask } from '../../lib/utils'
+import { maskBRL, parseBRL, numToMask, formatDate } from '../../lib/utils'
 import type { Mensalidade } from '../../lib/types'
 
 const EMPTY: Omit<Mensalidade, 'id'> = {
@@ -161,7 +161,10 @@ export default function Mensalidades() {
               </button>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium truncate">{i.cliente_nome}</p>
-                <p className="text-slate-500 text-xs mt-0.5">{i.descricao} · vence dia {i.dia_vencimento}</p>
+                <p className="text-slate-500 text-xs mt-0.5">
+                {i.descricao} · vence dia {i.dia_vencimento}
+                {i.data_inicio && ` · desde ${formatDate(i.data_inicio)}`}
+              </p>
               </div>
               <p className={`font-semibold text-sm shrink-0 ${i.status === 'ativo' ? 'text-emerald-400' : 'text-slate-500'}`}>R$ {i.valor}</p>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">

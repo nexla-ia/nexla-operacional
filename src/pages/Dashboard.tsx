@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   LogOut, Menu, LayoutGrid, FolderKanban, ChevronDown,
-  Users, UserCog, TrendingUp, CalendarDays, Receipt, RefreshCw, ArrowDownCircle,
+  Users, UserCog, TrendingUp, CalendarDays, Receipt, RefreshCw, ArrowDownCircle, MessageCircle,
   type LucideIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -17,6 +17,7 @@ import Calendario from '../components/cadastros/Calendario'
 import Despesas from '../components/cadastros/Despesas'
 import Mensalidades from '../components/cadastros/Mensalidades'
 import EntradasProjetos from '../components/cadastros/EntradasProjetos'
+import Cobranca from '../components/Cobranca'
 import type { User } from '@supabase/supabase-js'
 import type { Column, Project } from '../lib/types'
 import { uid } from '../lib/utils'
@@ -45,6 +46,7 @@ type NavItem = NavLeaf | NavGroup
 const NAV: NavItem[] = [
   { type: 'leaf',  id: 'kanban',   label: 'Kanban',   icon: LayoutGrid   },
   { type: 'leaf',  id: 'projetos', label: 'Projetos', icon: FolderKanban },
+  { type: 'leaf',  id: 'cobranca', label: 'Cobranças', icon: MessageCircle },
   {
     type: 'group', id: 'cadastros', label: 'Cadastros', icon: Users,
     children: [
@@ -60,7 +62,7 @@ const NAV: NavItem[] = [
 ]
 
 const SECTION_LABELS: Record<string, string> = {
-  kanban: 'Kanban', projetos: 'Projetos', clientes: 'Clientes',
+  kanban: 'Kanban', projetos: 'Projetos', cobranca: 'Cobranças', clientes: 'Clientes',
   usuarios: 'Usuários', financeiro: 'Financeiro', calendario: 'Calendário',
   despesas: 'Despesas', mensalidades: 'Mensalidades', entradas: 'Entradas de Projetos',
 }
@@ -220,6 +222,7 @@ export default function Dashboard() {
           <div className="relative z-10 animate-fade-in-up h-full">
             {activeSection === 'kanban'       && <KanbanBoard columns={columns} setColumns={setColumns} />}
             {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} />}
+            {activeSection === 'cobranca'     && <Cobranca />}
             {activeSection === 'clientes'     && <Clientes />}
             {activeSection === 'usuarios'     && <Usuarios />}
             {activeSection === 'financeiro'   && <Financeiro />}

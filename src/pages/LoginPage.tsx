@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Eye, EyeOff, Loader2, Zap, ShieldCheck } from 'lucide-react'
+import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { signIn } from '../lib/auth'
+import LogoIcon from '../components/LogoIcon'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -49,8 +50,8 @@ export default function LoginPage() {
 
         {/* Logo e título */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 mb-5 shadow-2xl shadow-indigo-500/50 ring-1 ring-white/10">
-            <Zap className="w-9 h-9 text-white drop-shadow" />
+          <div className="inline-flex items-center justify-center w-28 h-28 rounded-2xl bg-slate-900/80 mb-5 shadow-2xl shadow-cyan-500/20 ring-1 ring-white/10">
+            <LogoIcon className="w-20 h-20" />
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">
             Nexla{' '}

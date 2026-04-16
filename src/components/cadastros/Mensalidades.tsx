@@ -106,7 +106,7 @@ export default function Mensalidades() {
     setError('')
     const payload = { cliente_nome: data.cliente_nome, descricao: data.descricao,
       valor: parseBRL(data.valor), dia_vencimento: parseInt(data.dia_vencimento),
-      status: data.status, data_inicio: data.data_inicio || null }
+      status: data.status, ...(data.data_inicio ? { data_inicio: data.data_inicio } : {}) }
     if (editId) {
       const { error } = await supabase.from('mensalidades').update(payload).eq('id', editId)
       if (error) { setError('Erro ao salvar.'); return }

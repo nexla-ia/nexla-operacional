@@ -6,8 +6,6 @@ import type { Expense } from '../../lib/types'
 
 const EMPTY: Omit<Expense, 'id'> = { descricao: '', valor: '', data: '', categoria: '', tipo: 'avulsa' }
 
-const CATEGORIAS = ['Aluguel','Salários','Fornecedores','Marketing','Tecnologia','Transporte','Alimentação','Impostos','Outros']
-
 const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
   focus:border-indigo-500/40 transition-all hover:border-white/20`
@@ -55,10 +53,7 @@ function ExpenseModal({ initial, editing, tipo, onSave, onClose }: {
               <input type="date" className={inputCls + ' cursor-pointer'} value={form.data} onChange={e => set('data', e.target.value)} style={{ colorScheme: 'dark' }} required /></div>
           </div>
           <div><label className={labelCls}>Categoria</label>
-            <select className={inputCls + ' cursor-pointer'} value={form.categoria} onChange={e => set('categoria', e.target.value)} style={{ colorScheme: 'dark' }}>
-              <option value="">Selecione…</option>
-              {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-            </select></div>
+            <input className={inputCls} placeholder="Ex: Aluguel, Salários…" value={form.categoria} onChange={e => set('categoria', e.target.value)} /></div>
           <div className="flex gap-3 pt-1">
             <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/25 disabled:opacity-60 hover:-translate-y-0.5 transition-all duration-300">
               {saving ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Salvando…</span> : editing ? 'Salvar' : 'Criar'}

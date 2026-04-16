@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, X, Users, Loader2, Phone, Mail, FileText } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Pencil, Trash2, X, Users, Loader2, Phone, Mail, FileText, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { maskPhone, maskCPF, maskCNPJ } from '../../lib/utils'
 import type { Client } from '../../lib/types'
@@ -10,6 +10,41 @@ const EMPTY: Omit<Client, 'id'> = {
 }
 
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
+
+function UFSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    if (open) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-indigo-500/40 transition-all hover:border-white/20 flex items-center justify-between">
+        <span className={value ? 'text-white' : 'text-slate-500'}>{value || 'UF'}</span>
+        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-h-44 overflow-y-auto scrollbar-thin">
+          <button type="button" onClick={() => { onChange(''); setOpen(false) }}
+            className="w-full text-left px-4 py-2 text-sm text-slate-500 hover:bg-white/10 transition-colors">
+            Selecione...
+          </button>
+          {ESTADOS.map(uf => (
+            <button key={uf} type="button" onClick={() => { onChange(uf); setOpen(false) }}
+              className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-white/10 ${value === uf ? 'text-indigo-300' : 'text-slate-300'}`}>
+              {uf}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
@@ -92,10 +127,7 @@ function ClientModal({ initial, editing, onSave, onClose }: {
             <div className="col-span-2"><label className={labelCls}>Cidade</label>
               <input className={inputCls} placeholder="São Paulo" value={form.cidade} onChange={e => set('cidade', e.target.value)} /></div>
             <div><label className={labelCls}>Estado</label>
-              <select className={inputCls + ' cursor-pointer'} value={form.estado} onChange={e => set('estado', e.target.value)} style={{ colorScheme: 'dark' }}>
-                <option value="">UF</option>
-                {ESTADOS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
-              </select></div>
+              <UFSelect value={form.estado} onChange={v => set('estado', v)} /></div>
           </div>
           {/* Observações */}
           <div><label className={labelCls}>Observações</label>

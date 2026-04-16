@@ -209,7 +209,7 @@ interface CardProps {
 }
 
 function ProjectCard({ project, onEdit, onDelete }: CardProps) {
-  const badge = TIPO_BADGE[project.tipo_projeto] ?? TIPO_BADGE.outro
+  const badge = 'bg-indigo-500/15 text-indigo-300 ring-indigo-500/20'
   const tipoLabel = project.tipo_projeto
 
   return (

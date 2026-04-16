@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Plus, Pencil, Trash2, X, FolderKanban, Calendar, DollarSign, User, Phone } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Pencil, Trash2, X, FolderKanban, Calendar, DollarSign, User, Phone, Loader2 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 import type { Project } from '../lib/types'
 
 export type { Project }
@@ -14,18 +15,27 @@ const EMPTY: Omit<Project, 'id'> = {
   descricao:      '',
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-function uid() {
-  return Math.random().toString(36).slice(2, 9)
+/** Máscara BRL: conforme digita → "1.234,56" */
+function maskBRL(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (!digits) return ''
+  const num = parseInt(digits, 10) / 100
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function formatCurrency(raw: string) {
-  const n = parseFloat(raw.replace(',', '.'))
-  if (isNaN(n)) return raw
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+/** "1.234,56" → 1234.56 para salvar no banco */
+function parseBRL(masked: string): number | null {
+  if (!masked) return null
+  const n = parseFloat(masked.replace(/\./g, '').replace(',', '.'))
+  return isNaN(n) ? null : n
+}
+
+/** Número do banco → "1.234,56" para mostrar no form */
+function numToMask(n: number | null): string {
+  if (n == null) return ''
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function formatDate(iso: string) {
@@ -34,26 +44,60 @@ function formatDate(iso: string) {
   return `${d}/${m}/${y}`
 }
 
+// ── Mapeamento banco ↔ componente ─────────────────────────────────────────────
+
+function fromDB(row: Record<string, unknown>): Project {
+  return {
+    id:             row.id as string,
+    nome_projeto:   (row.nome_projeto as string) ?? '',
+    tipo_projeto:   (row.tipo_projeto as string) ?? '',
+    nome_cliente:   (row.nome_cliente as string) ?? '',
+    numero_cliente: (row.numero_cliente as string) ?? '',
+    valor:          numToMask(row.valor as number | null),
+    data_termino:   (row.data_termino as string) ?? '',
+    descricao:      (row.descricao as string) ?? '',
+  }
+}
+
+function toDB(data: Omit<Project, 'id'>) {
+  return {
+    nome_projeto:   data.nome_projeto,
+    tipo_projeto:   data.tipo_projeto  || null,
+    nome_cliente:   data.nome_cliente  || null,
+    numero_cliente: data.numero_cliente || null,
+    valor:          parseBRL(data.valor),
+    data_termino:   data.data_termino  || null,
+    descricao:      data.descricao     || null,
+  }
+}
+
 // ── Modal ──────────────────────────────────────────────────────────────────────
 
 interface ModalProps {
   initial: Omit<Project, 'id'>
-  onSave: (data: Omit<Project, 'id'>) => void
+  onSave:  (data: Omit<Project, 'id'>) => Promise<void>
   onClose: () => void
   editing: boolean
 }
 
 function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
-  const [form, setForm] = useState<Omit<Project, 'id'>>(initial)
+  const [form, setForm]   = useState<Omit<Project, 'id'>>(initial)
+  const [saving, setSaving] = useState(false)
 
   function set(field: keyof Omit<Project, 'id'>, value: string) {
     setForm(f => ({ ...f, [field]: value }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleValor(e: React.ChangeEvent<HTMLInputElement>) {
+    set('valor', maskBRL(e.target.value))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.nome_projeto.trim()) return
-    onSave(form)
+    setSaving(true)
+    await onSave(form)
+    setSaving(false)
   }
 
   const inputCls = `
@@ -65,10 +109,8 @@ function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Card */}
       <div className="relative w-full max-w-2xl bg-slate-900 border border-white/[0.09] rounded-3xl shadow-2xl shadow-black/60 overflow-hidden animate-fade-in-up">
 
         {/* Header */}
@@ -92,7 +134,7 @@ function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
         {/* Form */}
         <form onSubmit={handleSubmit} className="px-7 py-6 space-y-5 max-h-[70vh] overflow-y-auto">
 
-          {/* Nome projeto | Tipo */}
+          {/* Nome | Tipo */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Nome do Projeto *</label>
@@ -115,7 +157,7 @@ function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
             </div>
           </div>
 
-          {/* Nome cliente | Número cliente */}
+          {/* Cliente | Telefone */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Nome do Cliente</label>
@@ -138,16 +180,22 @@ function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
             </div>
           </div>
 
-          {/* Valor | Data terminar */}
+          {/* Valor | Data */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Valor (R$)</label>
-              <input
-                className={inputCls}
-                placeholder="Ex: 5000,00"
-                value={form.valor}
-                onChange={e => set('valor', e.target.value)}
-              />
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">
+                  R$
+                </span>
+                <input
+                  className={inputCls + ' pl-9'}
+                  placeholder="0,00"
+                  value={form.valor}
+                  onChange={handleValor}
+                  inputMode="numeric"
+                />
+              </div>
             </div>
             <div>
               <label className={labelCls}>Data para Terminar</label>
@@ -177,19 +225,25 @@ function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
           <div className="flex gap-3 pt-1">
             <button
               type="submit"
+              disabled={saving}
               className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold
-                         btn-shimmer shadow-lg shadow-indigo-500/25
-                         hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:translate-y-0
+                         btn-shimmer shadow-lg shadow-indigo-500/25 disabled:opacity-60
+                         disabled:cursor-not-allowed hover:shadow-indigo-500/40
+                         hover:-translate-y-0.5 active:translate-y-0
                          transition-all duration-300 focus:outline-none"
             >
-              {editing ? 'Salvar alterações' : 'Criar Projeto'}
+              {saving
+                ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</span>
+                : editing ? 'Salvar alterações' : 'Criar Projeto'
+              }
             </button>
             <button
               type="button"
               onClick={onClose}
+              disabled={saving}
               className="px-5 py-2.5 rounded-xl text-slate-400 text-sm font-medium
                          bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07]
-                         transition-colors"
+                         transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -203,20 +257,17 @@ function ProjectModal({ initial, onSave, onClose, editing }: ModalProps) {
 // ── Card ───────────────────────────────────────────────────────────────────────
 
 interface CardProps {
-  project: Project
-  onEdit: () => void
+  project:  Project
+  onEdit:   () => void
   onDelete: () => void
 }
 
 function ProjectCard({ project, onEdit, onDelete }: CardProps) {
-  const badge = 'bg-indigo-500/15 text-indigo-300 ring-indigo-500/20'
-  const tipoLabel = project.tipo_projeto
-
   return (
     <div className="group flex flex-col gap-4 p-5 rounded-2xl bg-slate-900/70 border border-white/[0.07]
                     hover:border-white/[0.13] backdrop-blur-sm transition-all duration-200">
 
-      {/* Top row */}
+      {/* Top */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="text-white font-semibold text-sm truncate">{project.nome_projeto}</h3>
@@ -224,12 +275,15 @@ function ProjectCard({ project, onEdit, onDelete }: CardProps) {
             <p className="text-slate-500 text-xs mt-0.5 truncate">{project.nome_cliente}</p>
           )}
         </div>
-        <span className={`shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-full ring-1 ${badge}`}>
-          {tipoLabel}
-        </span>
+        {project.tipo_projeto && (
+          <span className="shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-full ring-1
+                           bg-indigo-500/15 text-indigo-300 ring-indigo-500/20">
+            {project.tipo_projeto}
+          </span>
+        )}
       </div>
 
-      {/* Info grid */}
+      {/* Info */}
       <div className="grid grid-cols-2 gap-2.5">
         {project.numero_cliente && (
           <div className="flex items-center gap-1.5 text-slate-400 text-xs">
@@ -240,7 +294,9 @@ function ProjectCard({ project, onEdit, onDelete }: CardProps) {
         {project.valor && (
           <div className="flex items-center gap-1.5 text-slate-400 text-xs">
             <DollarSign className="w-3 h-3 shrink-0 text-slate-600" />
-            <span className="truncate">{formatCurrency(project.valor)}</span>
+            <span className="truncate font-medium text-emerald-400">
+              R$ {project.valor}
+            </span>
           </div>
         )}
         {project.data_termino && (
@@ -257,14 +313,11 @@ function ProjectCard({ project, onEdit, onDelete }: CardProps) {
         )}
       </div>
 
-      {/* Descrição */}
       {project.descricao && (
-        <p className="text-slate-500 text-xs leading-relaxed line-clamp-2">
-          {project.descricao}
-        </p>
+        <p className="text-slate-500 text-xs leading-relaxed line-clamp-2">{project.descricao}</p>
       )}
 
-      {/* Ações — visíveis no hover */}
+      {/* Ações */}
       <div className="flex gap-2 pt-1 border-t border-white/[0.05] opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={onEdit}
@@ -295,9 +348,68 @@ interface ProjectsProps {
 
 export default function Projects({ onProjectCreated }: ProjectsProps) {
   const [projects, setProjects]       = useState<Project[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState('')
   const [modalOpen, setModalOpen]     = useState(false)
   const [editingId, setEditingId]     = useState<string | null>(null)
   const [formInitial, setFormInitial] = useState<Omit<Project, 'id'>>(EMPTY)
+
+  // ── Carregar projetos ───────────────────────────────────────────────────────
+
+  useEffect(() => {
+    loadProjects()
+  }, [])
+
+  async function loadProjects() {
+    setLoading(true)
+    setError('')
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setError('Erro ao carregar projetos.')
+    } else if (data) {
+      setProjects(data.map(fromDB))
+    }
+    setLoading(false)
+  }
+
+  // ── CRUD ────────────────────────────────────────────────────────────────────
+
+  async function handleSave(data: Omit<Project, 'id'>) {
+    setError('')
+    if (editingId) {
+      const { error } = await supabase
+        .from('projects')
+        .update(toDB(data))
+        .eq('id', editingId)
+
+      if (error) { setError('Erro ao salvar projeto.'); return }
+      setProjects(ps => ps.map(p => p.id === editingId ? { ...data, id: editingId } : p))
+    } else {
+      const { data: inserted, error } = await supabase
+        .from('projects')
+        .insert(toDB(data))
+        .select()
+        .single()
+
+      if (error || !inserted) { setError('Erro ao criar projeto.'); return }
+      const newProject = fromDB(inserted)
+      setProjects(ps => [newProject, ...ps])
+      onProjectCreated(newProject)
+    }
+    setModalOpen(false)
+  }
+
+  async function handleDelete(id: string) {
+    const { error } = await supabase.from('projects').delete().eq('id', id)
+    if (error) { setError('Erro ao excluir projeto.'); return }
+    setProjects(ps => ps.filter(p => p.id !== id))
+  }
+
+  // ── Modal helpers ───────────────────────────────────────────────────────────
 
   function openNew() {
     setFormInitial(EMPTY)
@@ -312,20 +424,7 @@ export default function Projects({ onProjectCreated }: ProjectsProps) {
     setModalOpen(true)
   }
 
-  function handleSave(data: Omit<Project, 'id'>) {
-    if (editingId) {
-      setProjects(ps => ps.map(p => p.id === editingId ? { ...data, id: editingId } : p))
-    } else {
-      const newProject = { ...data, id: uid() }
-      setProjects(ps => [...ps, newProject])
-      onProjectCreated(newProject)
-    }
-    setModalOpen(false)
-  }
-
-  function handleDelete(id: string) {
-    setProjects(ps => ps.filter(p => p.id !== id))
-  }
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -334,7 +433,7 @@ export default function Projects({ onProjectCreated }: ProjectsProps) {
         <div>
           <h1 className="text-white font-bold text-xl">Projetos</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {projects.length} {projects.length === 1 ? 'projeto' : 'projetos'}
+            {loading ? 'Carregando…' : `${projects.length} ${projects.length === 1 ? 'projeto' : 'projetos'}`}
           </p>
         </div>
         <button
@@ -348,8 +447,20 @@ export default function Projects({ onProjectCreated }: ProjectsProps) {
         </button>
       </div>
 
-      {/* Grid */}
-      {projects.length === 0 ? (
+      {/* Erro */}
+      {error && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          {error}
+          <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+        </div>
+      ) : projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-center">
           <div className="w-14 h-14 rounded-2xl bg-slate-900/80 ring-1 ring-white/10 flex items-center justify-center mb-4">
             <FolderKanban className="w-6 h-6 text-slate-600" />

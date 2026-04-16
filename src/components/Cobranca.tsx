@@ -90,9 +90,14 @@ export default function Cobranca() {
       const nome = c.nome?.toLowerCase() ?? ''
       const items: PendingItem[] = []
 
-      // Mensalidades cujo cliente_nome bate com o nome do cliente
+      // Mensalidades: primeiro por client_id (FK), depois por nome (retrocompat.)
       for (const m of mensalidades ?? []) {
-        if ((m.cliente_nome ?? '').toLowerCase().includes(nome) || nome.includes((m.cliente_nome ?? '').toLowerCase())) {
+        const matchById   = m.client_id && m.client_id === c.id
+        const matchByName = !m.client_id && (
+          (m.cliente_nome ?? '').toLowerCase().includes(nome) ||
+          nome.includes((m.cliente_nome ?? '').toLowerCase())
+        )
+        if (matchById || matchByName) {
           items.push({
             tipo: 'mensalidade',
             descricao: m.descricao ?? 'Mensalidade',
@@ -102,10 +107,13 @@ export default function Cobranca() {
         }
       }
 
-      // Entradas de projetos cujo cliente bate
+      // Entradas de projetos: por client_id ou por nome do projeto mapeado
       for (const e of entries ?? []) {
+        const matchById = e.client_id && e.client_id === c.id
         const projCliente = projectClientMap[(e.nome_projeto ?? '').toLowerCase()] ?? ''
-        if (projCliente && (projCliente.includes(nome) || nome.includes(projCliente))) {
+        const matchByName = !e.client_id && projCliente &&
+          (projCliente.includes(nome) || nome.includes(projCliente))
+        if (matchById || matchByName) {
           items.push({
             tipo: 'projeto',
             descricao: e.nome_projeto ?? 'Projeto',

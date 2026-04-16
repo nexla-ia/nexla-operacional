@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, X, RefreshCw, Loader2, CheckCircle, PauseCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Pencil, Trash2, X, RefreshCw, Loader2, CheckCircle, PauseCircle, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { maskBRL, parseBRL, numToMask, formatDate } from '../../lib/utils'
-import type { Mensalidade } from '../../lib/types'
+import type { Mensalidade, Client } from '../../lib/types'
 
 const EMPTY: Omit<Mensalidade, 'id'> = {
-  cliente_nome: '', descricao: '', valor: '', dia_vencimento: '', status: 'ativo', data_inicio: '',
+  client_id: undefined, cliente_nome: '', descricao: '', valor: '',
+  dia_vencimento: '', status: 'ativo', data_inicio: '',
 }
 
 const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
@@ -15,15 +16,76 @@ const labelCls = 'block text-xs font-medium text-slate-400 mb-1.5'
 
 function fromDB(r: Record<string, unknown>): Mensalidade {
   return {
-    id: r.id as string, cliente_nome: (r.cliente_nome as string) ?? '',
-    descricao: (r.descricao as string) ?? '', valor: numToMask(r.valor as number | null),
-    dia_vencimento: String(r.dia_vencimento ?? ''), status: (r.status as 'ativo' | 'inativo') ?? 'ativo',
+    id: r.id as string,
+    client_id: (r.client_id as string) || undefined,
+    cliente_nome: (r.cliente_nome as string) ?? '',
+    descricao: (r.descricao as string) ?? '',
+    valor: numToMask(r.valor as number | null),
+    dia_vencimento: String(r.dia_vencimento ?? ''),
+    status: (r.status as 'ativo' | 'inativo') ?? 'ativo',
     data_inicio: (r.data_inicio as string) ?? '',
   }
 }
 
-function MensalidadeModal({ initial, editing, onSave, onClose }: {
-  initial: Omit<Mensalidade, 'id'>; editing: boolean
+// ── Seletor de Cliente ────────────────────────────────────────────────────────
+
+function ClientSelect({ value, clienteNome, clients, onChange }: {
+  value?: string; clienteNome: string
+  clients: Client[]
+  onChange: (id: string, nome: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ]       = useState('')
+  const ref             = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    if (open) document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const filtered = clients.filter(c => c.nome.toLowerCase().includes(q.toLowerCase()))
+  const selected = clients.find(c => c.id === value)
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition-all hover:border-white/20 flex items-center justify-between">
+        <span className={selected ? 'text-white' : 'text-slate-500'}>
+          {selected ? selected.nome : clienteNome || 'Selecione o cliente…'}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+          <div className="p-2 border-b border-white/[0.07]">
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)}
+              placeholder="Buscar cliente…"
+              className="w-full px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none" />
+          </div>
+          <div className="max-h-44 overflow-y-auto">
+            {filtered.length === 0 && (
+              <p className="px-4 py-3 text-slate-500 text-xs">Nenhum cliente encontrado</p>
+            )}
+            {filtered.map(c => (
+              <button key={c.id} type="button"
+                onClick={() => { onChange(c.id, c.nome); setOpen(false); setQ('') }}
+                className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-white/10 ${value === c.id ? 'text-indigo-300' : 'text-slate-300'}`}>
+                <span className="block font-medium">{c.nome}</span>
+                {c.telefone && <span className="text-slate-500 text-xs">{c.telefone}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+function MensalidadeModal({ initial, editing, clients, onSave, onClose }: {
+  initial: Omit<Mensalidade, 'id'>; editing: boolean; clients: Client[]
   onSave: (d: Omit<Mensalidade, 'id'>) => Promise<void>; onClose: () => void
 }) {
   const [form, setForm] = useState(initial)
@@ -40,17 +102,28 @@ function MensalidadeModal({ initial, editing, onSave, onClose }: {
       <div className="relative w-full max-w-lg bg-slate-900 border border-white/[0.09] rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up">
         <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.07]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-violet-500/15 ring-1 ring-violet-500/25 flex items-center justify-center"><RefreshCw className="w-4 h-4 text-violet-400" /></div>
+            <div className="w-8 h-8 rounded-xl bg-violet-500/15 ring-1 ring-violet-500/25 flex items-center justify-center">
+              <RefreshCw className="w-4 h-4 text-violet-400" />
+            </div>
             <h2 className="text-white font-semibold text-base">{editing ? 'Editar Mensalidade' : 'Nova Mensalidade'}</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.07] transition-colors"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={submit} className="px-7 py-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><label className={labelCls}>Cliente *</label>
-              <input className={inputCls} placeholder="Nome do cliente" value={form.cliente_nome} onChange={e => set('cliente_nome', e.target.value)} required /></div>
-            <div><label className={labelCls}>Descrição *</label>
-              <input className={inputCls} placeholder="Ex: Manutenção mensal" value={form.descricao} onChange={e => set('descricao', e.target.value)} required /></div>
+          {/* Cliente */}
+          <div>
+            <label className={labelCls}>Cliente *</label>
+            <ClientSelect
+              value={form.client_id}
+              clienteNome={form.cliente_nome}
+              clients={clients}
+              onChange={(id, nome) => setForm(f => ({ ...f, client_id: id, cliente_nome: nome }))}
+            />
+          </div>
+          {/* Descrição */}
+          <div>
+            <label className={labelCls}>Descrição *</label>
+            <input className={inputCls} placeholder="Ex: Manutenção mensal" value={form.descricao} onChange={e => set('descricao', e.target.value)} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelCls}>Valor (R$)</label>
@@ -84,8 +157,11 @@ function MensalidadeModal({ initial, editing, onSave, onClose }: {
   )
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function Mensalidades() {
   const [items, setItems]     = useState<Mensalidade[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
   const [modal, setModal]     = useState(false)
@@ -96,17 +172,29 @@ export default function Mensalidades() {
 
   async function load() {
     setLoading(true)
-    const { data, error } = await supabase.from('mensalidades').select('*').order('cliente_nome')
-    if (error) setError('Erro ao carregar.')
-    else if (data) setItems(data.map(fromDB))
+    const [{ data: mens, error: e }, { data: cls }] = await Promise.all([
+      supabase.from('mensalidades').select('*').order('cliente_nome'),
+      supabase.from('clients').select('id,nome,telefone').order('nome'),
+    ])
+    if (e) setError('Erro ao carregar.')
+    else {
+      if (mens) setItems(mens.map(fromDB))
+      if (cls)  setClients(cls as Client[])
+    }
     setLoading(false)
   }
 
   async function handleSave(data: Omit<Mensalidade, 'id'>) {
     setError('')
-    const payload = { cliente_nome: data.cliente_nome, descricao: data.descricao,
-      valor: parseBRL(data.valor), dia_vencimento: parseInt(data.dia_vencimento),
-      status: data.status, ...(data.data_inicio ? { data_inicio: data.data_inicio } : {}) }
+    const payload = {
+      client_id: data.client_id || null,
+      cliente_nome: data.cliente_nome,
+      descricao: data.descricao,
+      valor: parseBRL(data.valor),
+      dia_vencimento: parseInt(data.dia_vencimento),
+      status: data.status,
+      ...(data.data_inicio ? { data_inicio: data.data_inicio } : {}),
+    }
     if (editId) {
       const { error } = await supabase.from('mensalidades').update(payload).eq('id', editId)
       if (error) { setError('Erro ao salvar.'); return }
@@ -162,9 +250,9 @@ export default function Mensalidades() {
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium truncate">{i.cliente_nome}</p>
                 <p className="text-slate-500 text-xs mt-0.5">
-                {i.descricao} · vence dia {i.dia_vencimento}
-                {i.data_inicio && ` · desde ${formatDate(i.data_inicio)}`}
-              </p>
+                  {i.descricao} · vence dia {i.dia_vencimento}
+                  {i.data_inicio && ` · desde ${formatDate(i.data_inicio)}`}
+                </p>
               </div>
               <p className={`font-semibold text-sm shrink-0 ${i.status === 'ativo' ? 'text-emerald-400' : 'text-slate-500'}`}>R$ {i.valor}</p>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -175,7 +263,7 @@ export default function Mensalidades() {
           ))}
         </div>
       )}
-      {modal && <MensalidadeModal initial={initial} editing={!!editId} onSave={handleSave} onClose={() => setModal(false)} />}
+      {modal && <MensalidadeModal initial={initial} editing={!!editId} clients={clients} onSave={handleSave} onClose={() => setModal(false)} />}
     </>
   )
 }

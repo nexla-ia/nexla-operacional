@@ -36,6 +36,7 @@ const ACCENT_BY_POS: Record<number, string> = {
 export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: KanbanBoardProps) {
   const [columns, setColumns]           = useState<Column[]>([])
   const [loading, setLoading]           = useState(true)
+  const [migrationPending, setMigrationPending] = useState(false)
   const [addingTask, setAddingTask]     = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [addingColumn, setAddingColumn] = useState(false)
@@ -45,23 +46,31 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
 
   useEffect(() => { load() }, [])
 
-  // Quando um projeto é criado, adiciona na primeira coluna
+  // Quando projeto criado chega E colunas já estão carregadas → insere no banco
   useEffect(() => {
-    if (!pendingTask || columns.length === 0) return
+    if (!pendingTask || loading || columns.length === 0) return
     const firstCol = [...columns].sort((a, b) => a.position - b.position)[0]
     if (firstCol) {
       addTaskToDB(firstCol.id, pendingTask.title, pendingTask.subtitle, true)
       onPendingTaskConsumed?.()
     }
-  }, [pendingTask])
+  }, [pendingTask, loading, columns.length])
 
   // ── Carga ────────────────────────────────────────────────────────────────────
 
   async function load() {
     setLoading(true)
+    setMigrationPending(false)
 
-    let { data: cols } = await supabase
+    let { data: cols, error: colsErr } = await supabase
       .from('kanban_columns').select('*').order('position')
+
+    // Tabela não existe ainda (migration 010 não rodou)
+    if (colsErr) {
+      setMigrationPending(true)
+      setLoading(false)
+      return
+    }
 
     // Semeia colunas padrão na primeira execução
     if (!cols || cols.length === 0) {
@@ -162,6 +171,23 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
     return (
       <div className="flex items-center justify-center h-48">
         <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+      </div>
+    )
+  }
+
+  if (migrationPending) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/20 flex items-center justify-center">
+          <Layers className="w-5 h-5 text-amber-400" />
+        </div>
+        <p className="text-white font-semibold text-sm">Configuração pendente</p>
+        <p className="text-slate-500 text-xs max-w-xs">
+          Execute a migration <span className="text-amber-400 font-mono">010_kanban.sql</span> no Supabase SQL Editor para ativar o Kanban.
+        </p>
+        <button onClick={load} className="mt-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:bg-white/10 transition-colors">
+          Tentar novamente
+        </button>
       </div>
     )
   }

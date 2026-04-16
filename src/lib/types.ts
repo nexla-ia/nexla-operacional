@@ -45,6 +45,7 @@ export interface Expense {
 
 export interface Mensalidade {
   id: string
+  client_id?: string
   cliente_nome: string
   descricao: string
   valor: string
@@ -55,6 +56,7 @@ export interface Mensalidade {
 
 export interface ProjectEntry {
   id: string
+  client_id?: string
   nome_projeto: string
   descricao: string
   valor: string

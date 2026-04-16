@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { MessageCircle, Copy, Check, Search, RefreshCw, Loader2, ChevronDown, ChevronUp, Phone, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { numToMask, parseBRL } from '../lib/utils'
+import { numToMask } from '../lib/utils'
 import type { Client } from '../lib/types'
 
 // ── Tipos internos ────────────────────────────────────────────────────────────

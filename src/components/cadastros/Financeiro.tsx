@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, DollarSign, Loader2, ArrowDownCircle, Receipt } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { numToMask, parseBRL, formatDate } from '../../lib/utils'
+import { numToMask, formatDate } from '../../lib/utils'
 
 interface Summary {
   entradas:  number

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { LogOut, Menu, LayoutGrid, type LucideIcon } from 'lucide-react'
+import { LogOut, Menu, LayoutGrid, FolderKanban, type LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { signOut } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import LogoIcon from '../components/LogoIcon'
 import KanbanBoard from '../components/KanbanBoard'
+import Projects from '../components/Projects'
 import type { User } from '@supabase/supabase-js'
 
 interface NavItem {
@@ -14,11 +15,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
+  { id: 'kanban',   label: 'Kanban',   icon: LayoutGrid   },
+  { id: 'projetos', label: 'Projetos', icon: FolderKanban },
 ]
 
 const SECTION_TITLES: Record<string, string> = {
-  kanban: 'Kanban',
+  kanban:   'Kanban',
+  projetos: 'Projetos',
 }
 
 export default function Dashboard() {
@@ -154,7 +157,8 @@ export default function Dashboard() {
           />
 
           <div className="relative z-10 animate-fade-in-up h-full">
-            {activeSection === 'kanban' && <KanbanBoard />}
+            {activeSection === 'kanban'   && <KanbanBoard />}
+            {activeSection === 'projetos' && <Projects />}
           </div>
         </main>
       </div>

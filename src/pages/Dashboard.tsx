@@ -7,6 +7,7 @@ import LogoIcon from '../components/LogoIcon'
 import KanbanBoard from '../components/KanbanBoard'
 import Projects from '../components/Projects'
 import type { User } from '@supabase/supabase-js'
+import type { Column, Project } from '../lib/types'
 
 interface NavItem {
   id: string
@@ -24,11 +25,24 @@ const SECTION_TITLES: Record<string, string> = {
   projetos: 'Projetos',
 }
 
+const INITIAL_COLUMNS: Column[] = [
+  { id: 'todo',  title: 'A Fazer',      tasks: [] },
+  { id: 'doing', title: 'Em Andamento', tasks: [] },
+  { id: 'done',  title: 'Concluída',    tasks: [] },
+]
+
+function uid() {
+  return Math.random().toString(36).slice(2, 9)
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [user, setUser]                 = useState<User | null>(null)
+  const [user, setUser]                   = useState<User | null>(null)
   const [activeSection, setActiveSection] = useState('kanban')
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
+  const [sidebarOpen, setSidebarOpen]     = useState(false)
+
+  // Estado compartilhado entre Kanban e Projetos
+  const [columns, setColumns] = useState<Column[]>(INITIAL_COLUMNS)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -40,6 +54,28 @@ export default function Dashboard() {
   async function handleLogout() {
     await signOut()
     navigate('/')
+  }
+
+  // Quando um projeto é criado, adiciona como card na coluna "A Fazer"
+  function handleProjectCreated(project: Project) {
+    setColumns(cols =>
+      cols.map(c =>
+        c.id === 'todo'
+          ? {
+              ...c,
+              tasks: [
+                ...c.tasks,
+                {
+                  id:          uid(),
+                  title:       project.nome_projeto,
+                  subtitle:    project.nome_cliente || undefined,
+                  fromProject: true,
+                },
+              ],
+            }
+          : c
+      )
+    )
   }
 
   const userInitials = user?.email
@@ -157,8 +193,12 @@ export default function Dashboard() {
           />
 
           <div className="relative z-10 animate-fade-in-up h-full">
-            {activeSection === 'kanban'   && <KanbanBoard />}
-            {activeSection === 'projetos' && <Projects />}
+            {activeSection === 'kanban' && (
+              <KanbanBoard columns={columns} setColumns={setColumns} />
+            )}
+            {activeSection === 'projetos' && (
+              <Projects onProjectCreated={handleProjectCreated} />
+            )}
           </div>
         </main>
       </div>

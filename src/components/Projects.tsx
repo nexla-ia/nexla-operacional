@@ -1,16 +1,8 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, X, FolderKanban, Calendar, DollarSign, User, Phone } from 'lucide-react'
+import type { Project } from '../lib/types'
 
-interface Project {
-  id: string
-  nome_projeto: string
-  tipo_projeto: string
-  nome_cliente: string
-  numero_cliente: string
-  valor: string
-  data_termino: string
-  descricao: string
-}
+export type { Project }
 
 const EMPTY: Omit<Project, 'id'> = {
   nome_projeto:   '',
@@ -297,10 +289,14 @@ function ProjectCard({ project, onEdit, onDelete }: CardProps) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function Projects() {
-  const [projects, setProjects]     = useState<Project[]>([])
-  const [modalOpen, setModalOpen]   = useState(false)
-  const [editingId, setEditingId]   = useState<string | null>(null)
+interface ProjectsProps {
+  onProjectCreated: (project: Project) => void
+}
+
+export default function Projects({ onProjectCreated }: ProjectsProps) {
+  const [projects, setProjects]       = useState<Project[]>([])
+  const [modalOpen, setModalOpen]     = useState(false)
+  const [editingId, setEditingId]     = useState<string | null>(null)
   const [formInitial, setFormInitial] = useState<Omit<Project, 'id'>>(EMPTY)
 
   function openNew() {
@@ -320,7 +316,9 @@ export default function Projects() {
     if (editingId) {
       setProjects(ps => ps.map(p => p.id === editingId ? { ...data, id: editingId } : p))
     } else {
-      setProjects(ps => [...ps, { ...data, id: uid() }])
+      const newProject = { ...data, id: uid() }
+      setProjects(ps => [...ps, newProject])
+      onProjectCreated(newProject)
     }
     setModalOpen(false)
   }

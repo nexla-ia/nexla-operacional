@@ -123,8 +123,6 @@ export default function Cobranca() {
         }
       }
 
-      if (items.length === 0) continue // só exibe clientes com pendências
-
       const total = items.reduce((s, i) => s + i.valor, 0)
       const message = buildMessage(c as Client, items, total)
 
@@ -165,7 +163,7 @@ export default function Cobranca() {
         <div>
           <h1 className="text-white font-bold text-xl">Cobranças</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {loading ? 'Carregando…' : `${filtered.length} cliente${filtered.length !== 1 ? 's' : ''} com pendências`}
+            {loading ? 'Carregando…' : `${filtered.length} cliente${filtered.length !== 1 ? 's' : ''} · ${rows.filter(r => r.total > 0).length} com pendências`}
           </p>
         </div>
         <button
@@ -258,7 +256,10 @@ export default function Cobranca() {
 
                   {/* Total + chevron */}
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-bold text-red-400">R$ {numToMask(total)}</span>
+                    {total > 0
+                      ? <span className="text-sm font-bold text-red-400">R$ {numToMask(total)}</span>
+                      : <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20">Em dia</span>
+                    }
                     {isOpen
                       ? <ChevronUp className="w-4 h-4 text-slate-500" />
                       : <ChevronDown className="w-4 h-4 text-slate-500" />}

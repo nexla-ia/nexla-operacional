@@ -1,20 +1,31 @@
 import { useEffect, useState } from 'react'
-import { LogOut, Menu, X } from 'lucide-react'
+import { LogOut, Menu, LayoutGrid, type LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { signOut } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import LogoIcon from '../components/LogoIcon'
+import KanbanBoard from '../components/KanbanBoard'
 import type { User } from '@supabase/supabase-js'
 
-const NAV_ITEMS: { label: string; id: string }[] = [
-  // Seções serão adicionadas aqui
+interface NavItem {
+  id: string
+  label: string
+  icon: LucideIcon
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'kanban', label: 'Kanban', icon: LayoutGrid },
 ]
+
+const SECTION_TITLES: Record<string, string> = {
+  kanban: 'Kanban',
+}
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [user, setUser] = useState<User | null>(null)
-  const [activeSection, setActiveSection] = useState('')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [user, setUser]                 = useState<User | null>(null)
+  const [activeSection, setActiveSection] = useState('kanban')
+  const [sidebarOpen, setSidebarOpen]   = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -35,7 +46,7 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden">
 
-      {/* ── Overlay mobile ── */}
+      {/* Overlay mobile */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm lg:hidden"
@@ -67,28 +78,27 @@ export default function Dashboard() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {NAV_ITEMS.length === 0 ? (
-            <p className="text-slate-600 text-xs text-center py-8 px-2">
-              Seções em breve
-            </p>
-          ) : (
-            NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon
+            const active = activeSection === item.id
+            return (
               <button
                 key={item.id}
                 onClick={() => { setActiveSection(item.id); setSidebarOpen(false) }}
                 className={`
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
                   transition-all duration-150
-                  ${activeSection === item.id
+                  ${active
                     ? 'bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-500/20'
                     : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-200'
                   }
                 `}
               >
+                <Icon className="w-4 h-4 shrink-0" />
                 {item.label}
               </button>
-            ))
-          )}
+            )
+          })}
         </nav>
 
         {/* User / Logout */}
@@ -101,7 +111,8 @@ export default function Dashboard() {
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-150"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+                       text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-150"
           >
             <LogOut className="w-4 h-4 shrink-0" />
             Sair
@@ -112,26 +123,21 @@ export default function Dashboard() {
       {/* ── Main content ── */}
       <div className="flex flex-col flex-1 min-w-0">
 
-        {/* Topbar mobile */}
-        <header className="flex lg:hidden items-center gap-3 px-4 py-4 border-b border-white/[0.07]">
+        {/* Topbar */}
+        <header className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.07] shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors lg:hidden"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <LogoIcon className="w-6 h-6" />
-          <span className="text-white font-semibold text-sm">Nexla Operacional</span>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className={`ml-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors ${sidebarOpen ? '' : 'hidden'}`}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <h2 className="text-white font-semibold text-base">
+            {SECTION_TITLES[activeSection] ?? 'Dashboard'}
+          </h2>
         </header>
 
         {/* Page area */}
-        <main className="flex-1 overflow-y-auto p-6 relative">
+        <main className="flex-1 overflow-auto p-6 relative">
 
           {/* Blobs de fundo */}
           <div className="pointer-events-none fixed -top-32 -right-32 w-[500px] h-[500px] bg-indigo-700 rounded-full mix-blend-screen filter blur-[140px] opacity-10" />
@@ -147,23 +153,8 @@ export default function Dashboard() {
             }}
           />
 
-          <div className="relative z-10 animate-fade-in-up">
-            {activeSection === '' && (
-              <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-                <div className="w-16 h-16 rounded-2xl bg-slate-900/80 ring-1 ring-white/10 flex items-center justify-center mb-6">
-                  <LogoIcon className="w-9 h-9" />
-                </div>
-                <h1 className="text-2xl font-bold text-white mb-2">
-                  Bem-vindo ao{' '}
-                  <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-                    Nexla Operacional
-                  </span>
-                </h1>
-                <p className="text-slate-500 text-sm max-w-xs">
-                  Selecione uma seção no menu lateral para começar.
-                </p>
-              </div>
-            )}
+          <div className="relative z-10 animate-fade-in-up h-full">
+            {activeSection === 'kanban' && <KanbanBoard />}
           </div>
         </main>
       </div>

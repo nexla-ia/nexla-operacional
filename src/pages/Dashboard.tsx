@@ -47,10 +47,15 @@ type NavItem = NavLeaf | NavGroup
 
 const NAV: NavItem[] = [
   { type: 'leaf', id: 'dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
-  { type: 'leaf', id: 'projetos',   label: 'Projetos',    icon: FolderKanban    },
   { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays    },
-  { type: 'leaf', id: 'kanban',     label: 'Kanban',      icon: LayoutGrid      },
-  { type: 'leaf', id: 'erros-n8n',  label: 'Erros N8N',  icon: AlertTriangle   },
+  {
+    type: 'group', id: 'grp-projetos', label: 'Projetos', icon: FolderKanban,
+    children: [
+      { type: 'leaf', id: 'projetos',  label: 'Projetos',  icon: FolderKanban },
+      { type: 'leaf', id: 'kanban',    label: 'Kanban',    icon: LayoutGrid   },
+      { type: 'leaf', id: 'erros-n8n', label: 'Erros N8N', icon: AlertTriangle },
+    ],
+  },
   {
     type: 'group', id: 'cadastros', label: 'Cadastros', icon: Users,
     children: [
@@ -115,7 +120,7 @@ export default function Dashboard() {
   const [role, setRole]                   = useState<'admin' | 'operator' | null>(null)
   const [activeSection, setActiveSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen]     = useState(false)
-  const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['cadastros', 'financeiro']))
+  const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['grp-projetos', 'cadastros', 'financeiro']))
   const [pendingKanbanTask, setPendingKanbanTask] = useState<{ title: string; subtitle?: string } | null>(null)
   const [unreadErrors, setUnreadErrors]   = useState(0)
 
@@ -182,12 +187,17 @@ export default function Dashboard() {
   }
 
   const OPERATOR_NAV: NavItem[] = [
-    { type: 'leaf', id: 'projetos',   label: 'Projetos',    icon: FolderKanban  },
-    { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays  },
-    { type: 'leaf', id: 'kanban',     label: 'Kanban',      icon: LayoutGrid    },
-    { type: 'leaf', id: 'erros-n8n',  label: 'Erros N8N',  icon: AlertTriangle },
-    { type: 'leaf', id: 'clientes',   label: 'Clientes',    icon: Users         },
-    { type: 'leaf', id: 'cobranca',   label: 'Cobranças',   icon: MessageCircle },
+    { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays },
+    {
+      type: 'group', id: 'grp-projetos', label: 'Projetos', icon: FolderKanban,
+      children: [
+        { type: 'leaf', id: 'projetos',  label: 'Projetos',  icon: FolderKanban  },
+        { type: 'leaf', id: 'kanban',    label: 'Kanban',    icon: LayoutGrid    },
+        { type: 'leaf', id: 'erros-n8n', label: 'Erros N8N', icon: AlertTriangle },
+      ],
+    },
+    { type: 'leaf', id: 'clientes', label: 'Clientes',  icon: Users         },
+    { type: 'leaf', id: 'cobranca', label: 'Cobranças', icon: MessageCircle },
   ]
   const visibleNav = role === 'operator' ? OPERATOR_NAV : NAV
 

@@ -1,24 +1,21 @@
 import { useState, useEffect } from 'react'
 import { UserCog, Loader2, X, Check, Plus, UserPlus } from 'lucide-react'
-import { createClient } from '@supabase/supabase-js'
-import { supabase, supabaseUrl, supabaseAnonKey } from '../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 
 interface Profile {
   id: string
   full_name: string
-  role: 'admin' | 'operator' | 'viewer'
+  role: 'admin' | 'operator'
 }
 
 const ROLES = [
-  { value: 'admin',    label: 'Admin',      desc: 'Acesso total' },
-  { value: 'operator', label: 'Operador',   desc: 'Criação e edição' },
-  { value: 'viewer',   label: 'Visualizar', desc: 'Somente leitura' },
+  { value: 'admin',    label: 'Admin',    desc: 'Acesso total' },
+  { value: 'operator', label: 'Operador', desc: 'Criação e edição' },
 ]
 
 const ROLE_BADGE: Record<string, string> = {
   admin:    'bg-red-500/15 text-red-300 ring-red-500/20',
   operator: 'bg-indigo-500/15 text-indigo-300 ring-indigo-500/20',
-  viewer:   'bg-slate-500/15 text-slate-300 ring-slate-500/20',
 }
 
 const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
@@ -32,7 +29,7 @@ function NovoUsuarioModal({ onCreated, onClose }: { onCreated: () => void; onClo
   const [email, setEmail]   = useState('')
   const [senha, setSenha]   = useState('')
   const [nome, setNome]     = useState('')
-  const [role, setRole]     = useState<'admin' | 'operator' | 'viewer'>('operator')
+  const [role, setRole]     = useState<'admin' | 'operator'>('operator')
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -41,23 +38,30 @@ function NovoUsuarioModal({ onCreated, onClose }: { onCreated: () => void; onClo
     setError('')
     setSaving(true)
 
-    // Cliente temporário sem persistir sessão — não afeta o admin logado
-    const tmp = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
+    // Cria o usuário via Admin API (sem exigir confirmação de e-mail)
+    const { data, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: senha,
+      email_confirm: true,
+      user_metadata: { full_name: nome },
     })
 
-    const { data, error: signUpErr } = await tmp.auth.signUp({ email, password: senha })
-    if (signUpErr || !data.user) {
-      setError(signUpErr?.message || 'Erro ao criar usuário.')
+    if (createErr || !data.user) {
+      setError(createErr?.message || 'Erro ao criar usuário.')
       setSaving(false)
       return
     }
 
-    // Atualiza o perfil com nome e cargo (trigger já cria o perfil no signup)
-    await supabase
+    // Salva nome e cargo no perfil (upsert garante que funciona mesmo se o trigger já inseriu)
+    const { error: profileErr } = await supabaseAdmin
       .from('profiles')
-      .update({ full_name: nome, role })
-      .eq('id', data.user.id)
+      .upsert({ id: data.user.id, full_name: nome, role }, { onConflict: 'id' })
+
+    if (profileErr) {
+      setError('Usuário criado, mas perfil não salvo: ' + profileErr.message)
+      setSaving(false)
+      return
+    }
 
     setSaving(false)
     onCreated()
@@ -159,10 +163,10 @@ export default function Usuarios() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 animate-stagger-1">
         <div>
-          <h1 className="text-white font-bold text-xl">Usuários</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <h1 className="text-white font-extrabold text-xl tracking-tight">Usuários</h1>
+          <p className="text-slate-600 text-sm mt-0.5 font-medium">
             {loading ? 'Carregando…' : `${profiles.length} usuário${profiles.length !== 1 ? 's' : ''}`}
           </p>
         </div>
@@ -189,9 +193,9 @@ export default function Usuarios() {
           <p className="text-slate-600 text-xs mt-1">Clique em "Novo Usuário" para começar</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5 animate-stagger-2">
           {profiles.map(p => (
-            <div key={p.id} className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-slate-900/70 border border-white/[0.07] hover:border-white/[0.12] transition-all">
+            <div key={p.id} className="flex items-center gap-4 px-5 py-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.09] hover:bg-white/[0.03] transition-all">
               <div className="w-9 h-9 rounded-xl bg-indigo-500/20 ring-1 ring-indigo-500/30 flex items-center justify-center shrink-0">
                 <span className="text-indigo-300 text-xs font-bold">{(p.full_name || 'U').slice(0, 2).toUpperCase()}</span>
               </div>

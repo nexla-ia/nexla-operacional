@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   LogOut, Menu, LayoutGrid, FolderKanban, ChevronDown,
   Users, UserCog, TrendingUp, CalendarDays, Receipt, RefreshCw, ArrowDownCircle, MessageCircle,
+  LayoutDashboard, AlertTriangle,
   type LucideIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -18,6 +19,9 @@ import Despesas from '../components/cadastros/Despesas'
 import Mensalidades from '../components/cadastros/Mensalidades'
 import EntradasProjetos from '../components/cadastros/EntradasProjetos'
 import Cobranca from '../components/Cobranca'
+import FinanceiroBar from '../components/FinanceiroBar'
+import DashboardHome from '../components/DashboardHome'
+import ErrosN8n from '../components/ErrosN8n'
 import type { User } from '@supabase/supabase-js'
 import type { Project } from '../lib/types'
 
@@ -43,27 +47,29 @@ type NavItem = NavLeaf | NavGroup
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
 const NAV: NavItem[] = [
-  { type: 'leaf',  id: 'kanban',   label: 'Kanban',   icon: LayoutGrid   },
-  { type: 'leaf',  id: 'projetos', label: 'Projetos', icon: FolderKanban },
-  { type: 'leaf',  id: 'cobranca', label: 'Cobranças', icon: MessageCircle },
+  { type: 'leaf',  id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { type: 'leaf',  id: 'kanban',    label: 'Kanban',    icon: LayoutGrid      },
+  { type: 'leaf',  id: 'projetos',  label: 'Projetos',  icon: FolderKanban    },
+  { type: 'leaf',  id: 'cobranca',  label: 'Cobranças', icon: MessageCircle   },
   {
     type: 'group', id: 'cadastros', label: 'Cadastros', icon: Users,
     children: [
       { type: 'leaf', id: 'clientes',  label: 'Clientes',             icon: Users            },
       { type: 'leaf', id: 'usuarios',  label: 'Usuários',             icon: UserCog          },
-      { type: 'leaf', id: 'financeiro',label: 'Financeiro',           icon: TrendingUp       },
       { type: 'leaf', id: 'calendario',label: 'Calendário',           icon: CalendarDays     },
       { type: 'leaf', id: 'despesas',  label: 'Despesas',             icon: Receipt          },
       { type: 'leaf', id: 'mensalidades', label: 'Mensalidades',      icon: RefreshCw        },
       { type: 'leaf', id: 'entradas',  label: 'Entradas de Projetos', icon: ArrowDownCircle  },
     ],
   },
+  { type: 'leaf', id: 'erros-n8n', label: 'Erros N8N', icon: AlertTriangle },
 ]
 
 const SECTION_LABELS: Record<string, string> = {
-  kanban: 'Kanban', projetos: 'Projetos', cobranca: 'Cobranças', clientes: 'Clientes',
-  usuarios: 'Usuários', financeiro: 'Financeiro', calendario: 'Calendário',
-  despesas: 'Despesas', mensalidades: 'Mensalidades', entradas: 'Entradas de Projetos',
+  dashboard: 'Dashboard', kanban: 'Kanban', projetos: 'Projetos', cobranca: 'Cobranças',
+  clientes: 'Clientes', usuarios: 'Usuários', financeiro: 'Financeiro',
+  calendario: 'Calendário', despesas: 'Despesas', mensalidades: 'Mensalidades',
+  entradas: 'Entradas de Projetos', 'erros-n8n': 'Erros N8N',
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -71,7 +77,7 @@ const SECTION_LABELS: Record<string, string> = {
 export default function Dashboard() {
   const navigate = useNavigate()
   const [user, setUser]                   = useState<User | null>(null)
-  const [activeSection, setActiveSection] = useState('kanban')
+  const [activeSection, setActiveSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen]     = useState(false)
   const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['cadastros']))
   const [pendingKanbanTask, setPendingKanbanTask] = useState<{ title: string; subtitle?: string } | null>(null)
@@ -101,16 +107,16 @@ export default function Dashboard() {
   const userInitials = user?.email ? user.email.slice(0, 2).toUpperCase() : '??'
 
   const leafCls = (id: string) => `
-    w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+    relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
     transition-all duration-150
     ${activeSection === id
-      ? 'bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-500/20'
-      : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-200'
+      ? 'nav-active bg-indigo-500/10 text-indigo-300'
+      : 'text-slate-500 hover:bg-white/[0.04] hover:text-slate-200'
     }
   `
 
   return (
-    <div className="flex h-screen bg-slate-950 overflow-hidden">
+    <div className="grain flex h-screen bg-[#060709] overflow-hidden">
 
       {sidebarOpen && (
         <div className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
@@ -118,35 +124,39 @@ export default function Dashboard() {
 
       {/* ── Sidebar ── */}
       <aside className={`
-        fixed lg:static inset-y-0 left-0 z-30 flex flex-col w-64 shrink-0
-        bg-slate-900/80 backdrop-blur-2xl border-r border-white/[0.07]
+        fixed lg:static inset-y-0 left-0 z-30 flex flex-col w-60 shrink-0
+        bg-[#080a0f]/95 backdrop-blur-2xl border-r border-white/[0.05]
         transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 py-6 border-b border-white/[0.07]">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 ring-1 ring-white/10 shrink-0">
-            <LogoIcon className="w-6 h-6" />
+        <div className="flex items-center gap-3 px-5 pt-6 pb-5 border-b border-white/[0.05]">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20 shrink-0">
+            <LogoIcon className="w-5 h-5" />
           </div>
           <div className="leading-tight">
-            <p className="text-white font-semibold text-sm tracking-tight">Nexla</p>
-            <p className="text-slate-500 text-xs">Operacional</p>
+            <p className="text-white font-bold text-sm tracking-tight">Nexla</p>
+            <p className="text-slate-600 text-[11px] font-medium">Operacional</p>
           </div>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-2.5 py-4 space-y-0.5">
           {NAV.map(item => {
             if (item.type === 'leaf') {
               const Icon = item.icon
+              const isActive = activeSection === item.id
               return (
                 <button key={item.id} onClick={() => selectLeaf(item.id)} className={leafCls(item.id)}>
-                  <Icon className="w-4 h-4 shrink-0" />{item.label}
+                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors
+                    ${isActive ? 'bg-indigo-500/20' : 'bg-transparent group-hover:bg-white/5'}`}>
+                    <Icon className="w-3.5 h-3.5" />
+                  </div>
+                  {item.label}
                 </button>
               )
             }
 
-            // Group
             const group = item as NavGroup
             const isOpen = openGroups.has(group.id)
             const GroupIcon = group.icon
@@ -156,21 +166,26 @@ export default function Dashboard() {
               <div key={group.id}>
                 <button
                   onClick={() => toggleGroup(group.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150
-                    ${hasActive ? 'text-indigo-300' : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-200'}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-150 mt-3 mb-1
+                    ${hasActive ? 'text-indigo-400' : 'text-slate-600 hover:text-slate-400'}`}
                 >
-                  <GroupIcon className="w-4 h-4 shrink-0" />
+                  <GroupIcon className="w-3.5 h-3.5 shrink-0" />
                   <span className="flex-1 text-left">{group.label}</span>
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {isOpen && (
-                  <div className="mt-1 ml-3 pl-3 border-l border-white/[0.07] space-y-0.5">
+                  <div className="space-y-0.5">
                     {group.children.map(child => {
                       const ChildIcon = child.icon
+                      const isActive = activeSection === child.id
                       return (
                         <button key={child.id} onClick={() => selectLeaf(child.id)} className={leafCls(child.id)}>
-                          <ChildIcon className="w-3.5 h-3.5 shrink-0" />{child.label}
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors
+                            ${isActive ? 'bg-indigo-500/20' : ''}`}>
+                            <ChildIcon className="w-3.5 h-3.5" />
+                          </div>
+                          {child.label}
                         </button>
                       )
                     })}
@@ -182,36 +197,37 @@ export default function Dashboard() {
         </nav>
 
         {/* User / Logout */}
-        <div className="px-3 py-4 border-t border-white/[0.07] space-y-1">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl">
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 ring-1 ring-indigo-500/30 flex items-center justify-center shrink-0">
-              <span className="text-indigo-300 text-[10px] font-bold">{userInitials}</span>
+        <div className="px-2.5 py-4 border-t border-white/[0.05]">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-1">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500/30 to-violet-500/20 ring-1 ring-indigo-500/20 flex items-center justify-center shrink-0">
+              <span className="text-indigo-200 text-[10px] font-bold">{userInitials}</span>
             </div>
-            <span className="text-slate-400 text-xs truncate flex-1">{user?.email}</span>
+            <span className="text-slate-500 text-xs truncate flex-1 font-medium">{user?.email}</span>
           </div>
           <button onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-150">
-            <LogOut className="w-4 h-4 shrink-0" />Sair
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-red-500/8 hover:text-red-400 transition-all duration-150">
+            <LogOut className="w-3.5 h-3.5 shrink-0" />Sair
           </button>
         </div>
       </aside>
 
       {/* ── Main ── */}
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.07] shrink-0">
-          <button onClick={() => setSidebarOpen(true)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors lg:hidden">
+        <header className="flex items-center gap-3 px-6 py-3.5 border-b border-white/[0.05] shrink-0 bg-[#080a0f]/60 backdrop-blur-sm">
+          <button onClick={() => setSidebarOpen(true)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-colors lg:hidden">
             <Menu className="w-5 h-5" />
           </button>
-          <h2 className="text-white font-semibold text-base">{SECTION_LABELS[activeSection] ?? 'Dashboard'}</h2>
+          <h2 className="text-white font-semibold text-sm tracking-tight">{SECTION_LABELS[activeSection] ?? 'Dashboard'}</h2>
         </header>
 
         <main className="flex-1 overflow-auto p-6 relative">
-          <div className="pointer-events-none fixed -top-32 -right-32 w-[500px] h-[500px] bg-indigo-700 rounded-full mix-blend-screen filter blur-[140px] opacity-10" />
-          <div className="pointer-events-none fixed bottom-0 left-1/3 w-[400px] h-[400px] bg-violet-700 rounded-full mix-blend-screen filter blur-[140px] opacity-10" />
-          <div className="pointer-events-none fixed inset-0 opacity-[0.025]"
-            style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px)', backgroundSize: '48px 48px' }} />
+          <div className="pointer-events-none fixed -top-32 -right-32 w-[600px] h-[600px] bg-indigo-800 rounded-full mix-blend-screen filter blur-[160px] opacity-8" />
+          <div className="pointer-events-none fixed bottom-0 left-1/3 w-[500px] h-[500px] bg-violet-800 rounded-full mix-blend-screen filter blur-[160px] opacity-8" />
+          <div className="pointer-events-none fixed inset-0 opacity-[0.018]"
+            style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px)', backgroundSize: '52px 52px' }} />
 
           <div className="relative z-10 animate-fade-in-up h-full">
+            {activeSection === 'dashboard'    && <DashboardHome />}
             {activeSection === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
             {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} />}
             {activeSection === 'cobranca'     && <Cobranca />}
@@ -222,6 +238,7 @@ export default function Dashboard() {
             {activeSection === 'despesas'     && <Despesas />}
             {activeSection === 'mensalidades' && <Mensalidades />}
             {activeSection === 'entradas'     && <EntradasProjetos />}
+            {activeSection === 'erros-n8n'    && <ErrosN8n />}
           </div>
         </main>
       </div>

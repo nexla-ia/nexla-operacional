@@ -2,15 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: 16px; }
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(99, 102, 241, 0.35);
+  color: #e0e7ff;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Grain texture overlay ────────────────────────────────────────────────── */
+
+.grain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0.032;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+
 @keyframes blob {
-  0%   { transform: translate(0, 0) scale(1); }
-  33%  { transform: translate(40px, -60px) scale(1.15); }
-  66%  { transform: translate(-30px, 30px) scale(0.9); }
-  100% { transform: translate(0, 0) scale(1); }
+  0%,100% { transform: translate(0,0) scale(1); }
+  33%     { transform: translate(40px,-60px) scale(1.15); }
+  66%     { transform: translate(-30px,30px) scale(0.9); }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(24px); }
+  from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -19,15 +62,29 @@
   100% { background-position: 200% center; }
 }
 
-.animate-blob {
-  animation: blob 8s infinite ease-in-out;
+@keyframes pulse-glow {
+  0%,100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); }
+  50%     { box-shadow: 0 0 20px 4px rgba(99,102,241,0.15); }
 }
-.animation-delay-2000 { animation-delay: 2s; }
-.animation-delay-4000 { animation-delay: 4s; }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+
+.animate-blob              { animation: blob 9s infinite ease-in-out; }
+.animation-delay-2000      { animation-delay: 2s; }
+.animation-delay-4000      { animation-delay: 4s; }
+.animate-fade-in-up        { animation: fadeInUp 0.6s cubic-bezier(0.16,1,0.3,1) both; }
+.animate-stagger-1         { animation: stagger-in 0.5s cubic-bezier(0.16,1,0.3,1) 0.05s both; }
+.animate-stagger-2         { animation: stagger-in 0.5s cubic-bezier(0.16,1,0.3,1) 0.10s both; }
+.animate-stagger-3         { animation: stagger-in 0.5s cubic-bezier(0.16,1,0.3,1) 0.15s both; }
+.animate-stagger-4         { animation: stagger-in 0.5s cubic-bezier(0.16,1,0.3,1) 0.20s both; }
+.animate-stagger-5         { animation: stagger-in 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both; }
+.animate-stagger-6         { animation: stagger-in 0.5s cubic-bezier(0.16,1,0.3,1) 0.30s both; }
+.animate-pulse-glow        { animation: pulse-glow 3s ease-in-out infinite; }
+
+/* ── Shimmer button ───────────────────────────────────────────────────────── */
 
 .btn-shimmer {
   background-size: 200% auto;
@@ -42,7 +99,57 @@
   animation: shimmer 3s linear infinite;
 }
 
-body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ── Form inputs global style ─────────────────────────────────────────────── */
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+textarea,
+select {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* date/time color scheme */
+input[type="date"],
+input[type="time"] {
+  color-scheme: dark;
+}
+
+/* ── Numeric values use mono font ─────────────────────────────────────────── */
+
+.font-numeric {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Card hover lift ──────────────────────────────────────────────────────── */
+
+.card-lift {
+  transition: transform 0.2s cubic-bezier(0.16,1,0.3,1),
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+}
+
+/* ── Sidebar nav active indicator ─────────────────────────────────────────── */
+
+.nav-active {
+  position: relative;
+}
+.nav-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  height: 60%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, #818cf8, #6366f1);
 }

@@ -74,11 +74,20 @@ function MessageBody({ text }: { text: string }) {
                   {tok.v}<ExternalLink className="w-3 h-3 shrink-0" />
                 </a>
               )
-              if (tok.t === 'code') return (
-                <code key={j} className="font-mono text-[0.82em] px-1.5 py-0.5 rounded-md bg-white/[0.07] text-slate-200 border border-white/[0.08]">
-                  {tok.v}
-                </code>
-              )
+              if (tok.t === 'code') {
+                const isUrl = /^https?:\/\//.test(tok.v)
+                if (isUrl) return (
+                  <a key={j} href={tok.v} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-mono text-[0.82em] px-1.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:text-indigo-300 hover:bg-indigo-500/15 transition-colors break-all">
+                    {tok.v}<ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                )
+                return (
+                  <code key={j} className="font-mono text-[0.82em] px-1.5 py-0.5 rounded-md bg-white/[0.07] text-slate-200 border border-white/[0.08]">
+                    {tok.v}
+                  </code>
+                )
+              }
               if (tok.t === 'bold') return <strong key={j} className="font-semibold text-slate-100">{tok.v}</strong>
               return <span key={j}>{tok.v}</span>
             })}

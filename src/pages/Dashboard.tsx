@@ -79,6 +79,27 @@ const SECTION_LABELS: Record<string, string> = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+function playAlert() {
+  try {
+    const ctx = new AudioContext()
+    const t   = ctx.currentTime
+    ;[
+      { freq: 880, start: 0,    dur: 0.12 },
+      { freq: 660, start: 0.15, dur: 0.12 },
+      { freq: 880, start: 0.30, dur: 0.18 },
+    ].forEach(({ freq, start, dur }) => {
+      const osc  = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, t + start)
+      gain.gain.setValueAtTime(0.25, t + start)
+      gain.gain.exponentialRampToValueAtTime(0.001, t + start + dur)
+      osc.start(t + start); osc.stop(t + start + dur)
+    })
+  } catch { /* navegador sem suporte ou bloqueado */ }
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const [user, setUser]                   = useState<User | null>(null)
@@ -87,6 +108,7 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen]     = useState(false)
   const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['cadastros', 'financeiro']))
   const [pendingKanbanTask, setPendingKanbanTask] = useState<{ title: string; subtitle?: string } | null>(null)
+  const [unreadErrors, setUnreadErrors]   = useState(0)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -103,6 +125,26 @@ export default function Dashboard() {
     })
   }, [navigate])
 
+  // Realtime: badge + som ao chegar novo erro n8n
+  useEffect(() => {
+    // contagem inicial de erros abertos
+    supabase.from('n8n_errors').select('id', { count: 'exact', head: true })
+      .eq('resolved', false)
+      .then(({ count }) => setUnreadErrors(count ?? 0))
+
+    const ch = supabase.channel('dashboard_n8n_badge')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'n8n_errors' }, () => {
+        setUnreadErrors(n => n + 1)
+        playAlert()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'n8n_errors' }, payload => {
+        if (payload.new.resolved) setUnreadErrors(n => Math.max(0, n - 1))
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
   async function handleLogout() { await signOut(); navigate('/') }
 
   function handleProjectCreated(project: Project) {
@@ -116,7 +158,11 @@ export default function Dashboard() {
     setOpenGroups(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  function selectLeaf(id: string) { setActiveSection(id); setSidebarOpen(false) }
+  function selectLeaf(id: string) {
+    setActiveSection(id)
+    setSidebarOpen(false)
+    if (id === 'erros-n8n') setUnreadErrors(0)
+  }
 
   const OPERATOR_NAV: NavItem[] = [
     { type: 'leaf', id: 'projetos',   label: 'Projetos',    icon: FolderKanban  },
@@ -176,7 +222,12 @@ export default function Dashboard() {
                     ${isActive ? 'bg-indigo-500/20' : 'bg-transparent group-hover:bg-white/5'}`}>
                     <Icon className="w-3.5 h-3.5" />
                   </div>
-                  {item.label}
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {item.id === 'erros-n8n' && unreadErrors > 0 && (
+                    <span className="ml-auto flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold animate-pulse">
+                      {unreadErrors > 99 ? '99+' : unreadErrors}
+                    </span>
+                  )}
                 </button>
               )
             }

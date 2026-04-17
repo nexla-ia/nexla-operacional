@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   LogOut, Menu, LayoutGrid, FolderKanban, ChevronDown,
   Users, UserCog, CalendarDays, Receipt, RefreshCw, ArrowDownCircle, MessageCircle,
-  LayoutDashboard, AlertTriangle,
+  LayoutDashboard, AlertTriangle, Wallet,
   type LucideIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -46,29 +46,35 @@ type NavItem = NavLeaf | NavGroup
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
 const NAV: NavItem[] = [
-  { type: 'leaf',  id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { type: 'leaf',  id: 'kanban',    label: 'Kanban',    icon: LayoutGrid      },
-  { type: 'leaf',  id: 'projetos',  label: 'Projetos',  icon: FolderKanban    },
-  { type: 'leaf',  id: 'cobranca',  label: 'Cobranças', icon: MessageCircle   },
+  { type: 'leaf', id: 'dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
+  { type: 'leaf', id: 'projetos',   label: 'Projetos',    icon: FolderKanban    },
+  { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays    },
+  { type: 'leaf', id: 'kanban',     label: 'Kanban',      icon: LayoutGrid      },
+  { type: 'leaf', id: 'erros-n8n',  label: 'Erros N8N',  icon: AlertTriangle   },
   {
     type: 'group', id: 'cadastros', label: 'Cadastros', icon: Users,
     children: [
-      { type: 'leaf', id: 'clientes',  label: 'Clientes',             icon: Users            },
-      { type: 'leaf', id: 'usuarios',  label: 'Usuários',             icon: UserCog          },
-      { type: 'leaf', id: 'calendario',label: 'Calendário',           icon: CalendarDays     },
-      { type: 'leaf', id: 'despesas',  label: 'Despesas',             icon: Receipt          },
-      { type: 'leaf', id: 'mensalidades', label: 'Mensalidades',      icon: RefreshCw        },
-      { type: 'leaf', id: 'entradas',  label: 'Entradas de Projetos', icon: ArrowDownCircle  },
+      { type: 'leaf', id: 'clientes', label: 'Clientes', icon: Users   },
+      { type: 'leaf', id: 'usuarios', label: 'Usuários', icon: UserCog },
     ],
   },
-  { type: 'leaf', id: 'erros-n8n', label: 'Erros N8N', icon: AlertTriangle },
+  {
+    type: 'group', id: 'financeiro', label: 'Financeiro', icon: Wallet,
+    children: [
+      { type: 'leaf', id: 'despesas',     label: 'Despesas',             icon: Receipt         },
+      { type: 'leaf', id: 'mensalidades', label: 'Mensalidades',         icon: RefreshCw       },
+      { type: 'leaf', id: 'entradas',     label: 'Entradas de Projetos', icon: ArrowDownCircle },
+      { type: 'leaf', id: 'cobranca',     label: 'Cobranças',            icon: MessageCircle   },
+    ],
+  },
 ]
 
 const SECTION_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard', kanban: 'Kanban', projetos: 'Projetos', cobranca: 'Cobranças',
-  clientes: 'Clientes', usuarios: 'Usuários', financeiro: 'Financeiro',
-  calendario: 'Calendário', despesas: 'Despesas', mensalidades: 'Mensalidades',
-  entradas: 'Entradas de Projetos', 'erros-n8n': 'Erros N8N',
+  dashboard: 'Dashboard', projetos: 'Projetos', calendario: 'Calendários',
+  kanban: 'Kanban', 'erros-n8n': 'Erros N8N',
+  clientes: 'Clientes', usuarios: 'Usuários',
+  despesas: 'Despesas', mensalidades: 'Mensalidades',
+  entradas: 'Entradas de Projetos', cobranca: 'Cobranças',
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -78,7 +84,7 @@ export default function Dashboard() {
   const [user, setUser]                   = useState<User | null>(null)
   const [activeSection, setActiveSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen]     = useState(false)
-  const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['cadastros']))
+  const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['cadastros', 'financeiro']))
   const [pendingKanbanTask, setPendingKanbanTask] = useState<{ title: string; subtitle?: string } | null>(null)
 
   useEffect(() => {

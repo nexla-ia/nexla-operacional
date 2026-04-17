@@ -125,6 +125,14 @@ export default function Dashboard() {
     })
   }, [navigate])
 
+  // Atualiza título da aba com contagem de erros
+  useEffect(() => {
+    if (unreadErrors > 0)
+      document.title = `(${unreadErrors}) Nexla Operacional`
+    else
+      document.title = 'Nexla Operacional'
+  }, [unreadErrors])
+
   // Realtime: badge + som ao chegar novo erro n8n
   useEffect(() => {
     // contagem inicial de erros abertos

@@ -113,13 +113,6 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
     setColumns(cols => cols.map(c => c.id === colId ? { ...c, tasks: [...c.tasks, t] } : c))
   }
 
-  async function removeTaskFromDB(colId: string, taskId: string) {
-    await supabase.from('kanban_tasks').delete().eq('id', taskId)
-    setColumns(cols => cols.map(c =>
-      c.id === colId ? { ...c, tasks: c.tasks.filter(t => t.id !== taskId) } : c
-    ))
-  }
-
   async function moveTaskInDB(taskId: string, fromColId: string, toColId: string) {
     const newPos = columns.find(c => c.id === toColId)?.tasks.length ?? 0
     await supabase.from('kanban_tasks').update({ column_id: toColId, position: newPos }).eq('id', taskId)
@@ -224,7 +217,6 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
             )}
             {col.tasks.map(task => (
               <TaskCard key={task.id} task={task}
-                onRemove={() => removeTaskFromDB(col.id, task.id)}
                 onDragStart={() => onDragStart(task.id, col.id)} />
             ))}
           </div>
@@ -300,15 +292,15 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
 
 // ── TaskCard ───────────────────────────────────────────────────────────────────
 
-function TaskCard({ task, onRemove, onDragStart }: {
-  task: Task; onRemove: () => void; onDragStart: () => void
+function TaskCard({ task, onDragStart }: {
+  task: Task; onDragStart: () => void
 }) {
   const [dragging, setDragging] = useState(false)
   return (
     <div draggable
       onDragStart={() => { setDragging(true); onDragStart() }}
       onDragEnd={() => setDragging(false)}
-      className={`group flex items-start gap-2 px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/[0.06] hover:border-white/[0.13] cursor-grab active:cursor-grabbing transition-all duration-150
+      className={`flex items-start gap-2 px-3 py-2.5 rounded-xl bg-slate-800/80 border border-white/[0.06] hover:border-white/[0.13] cursor-grab active:cursor-grabbing transition-all duration-150
         ${dragging ? 'opacity-40 scale-95' : 'opacity-100 scale-100'}`}
     >
       <div className="flex-1 min-w-0">
@@ -322,10 +314,6 @@ function TaskCard({ task, onRemove, onDragStart }: {
           </span>
         )}
       </div>
-      <button onClick={onRemove}
-        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-red-400 mt-0.5 shrink-0">
-        <X className="w-3.5 h-3.5" />
-      </button>
     </div>
   )
 }

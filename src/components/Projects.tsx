@@ -379,6 +379,14 @@ export default function Projects({ onProjectCreated }: ProjectsProps) {
   }
 
   async function handleDelete(id: string) {
+    const proj = projects.find(p => p.id === id)
+    if (proj) {
+      // Remove do kanban a task criada quando o projeto foi adicionado
+      await supabase.from('kanban_tasks')
+        .delete()
+        .eq('title', proj.nome_projeto)
+        .eq('from_project', true)
+    }
     const { error } = await supabase.from('projects').delete().eq('id', id)
     if (error) { setError('Erro ao excluir projeto.'); return }
     setProjects(ps => ps.filter(p => p.id !== id))

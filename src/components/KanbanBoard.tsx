@@ -37,8 +37,6 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
   const [columns, setColumns]           = useState<Column[]>([])
   const [loading, setLoading]           = useState(true)
   const [migrationPending, setMigrationPending] = useState(false)
-  const [addingTask, setAddingTask]     = useState<string | null>(null)
-  const [newTaskTitle, setNewTaskTitle] = useState('')
   const [addingColumn, setAddingColumn] = useState(false)
   const [newColTitle, setNewColTitle]   = useState('')
   const [dragOverCol, setDragOverCol]   = useState<string | null>(null)
@@ -152,12 +150,6 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
     if (fromColId !== toColId) moveTaskInDB(taskId, fromColId, toColId)
   }
 
-  function submitTask(colId: string) {
-    if (!newTaskTitle.trim()) return
-    addTaskToDB(colId, newTaskTitle.trim())
-    setNewTaskTitle(''); setAddingTask(null)
-  }
-
   // ── Render ────────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -209,7 +201,7 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
 
           {/* Tasks */}
           <div className="px-3 pt-3 pb-1 flex flex-col gap-2 min-h-[48px]">
-            {col.tasks.length === 0 && addingTask !== col.id && (
+            {col.tasks.length === 0 && (
               <div className={`flex items-center justify-center h-12 rounded-xl border-2 border-dashed text-xs transition-colors
                 ${dragOverCol === col.id ? 'border-indigo-500/50 text-indigo-400' : 'border-white/[0.06] text-slate-300'}`}>
                 {dragOverCol === col.id ? 'Soltar aqui' : 'Sem tarefas'}
@@ -221,37 +213,7 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
             ))}
           </div>
 
-          {/* Add task */}
-          <div className="px-3 pb-4 pt-2">
-            {addingTask === col.id ? (
-              <div className="space-y-2">
-                <textarea autoFocus rows={2} value={newTaskTitle}
-                  onChange={e => setNewTaskTitle(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitTask(col.id) }
-                    if (e.key === 'Escape') { setAddingTask(null); setNewTaskTitle('') }
-                  }}
-                  placeholder="Título da tarefa…"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-indigo-500/40 text-white text-sm placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                />
-                <div className="flex gap-2">
-                  <button onClick={() => submitTask(col.id)}
-                    className="flex-1 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors">
-                    Adicionar
-                  </button>
-                  <button onClick={() => { setAddingTask(null); setNewTaskTitle('') }}
-                    className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button onClick={() => { setAddingTask(col.id); setNewTaskTitle('') }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:text-slate-300 hover:bg-white/[0.04] transition-all text-sm">
-                <Plus className="w-4 h-4" />Adicionar tarefa
-              </button>
-            )}
-          </div>
+          <div className="pb-3" />
         </div>
       ))}
 

@@ -9,6 +9,7 @@ interface N8nError {
   payload:     string
   resolved:    boolean
   resolved_at: string | null
+  resolved_by: string | null
   created_at:  string
 }
 
@@ -108,34 +109,42 @@ function ErrorCard({ error, onResolve }: {
   const isWarning  = typeof error.payload === 'string' && error.payload.includes('⚠️')
   const message    = typeof error.payload === 'string' ? error.payload : JSON.stringify(error.payload, null, 2)
 
-  const border = isResolved ? 'border-white/[0.06]' : isWarning ? 'border-amber-500/20' : 'border-red-500/20'
-  const bar    = isResolved ? '' : isWarning ? 'from-amber-500' : 'from-red-500'
+  const bg     = isResolved ? 'bg-slate-800/40' : isWarning ? 'bg-amber-950/30' : 'bg-red-950/20'
+  const border = isResolved ? 'border-white/[0.08]' : isWarning ? 'border-amber-500/30' : 'border-red-500/30'
+  const bar    = isWarning ? 'from-amber-500' : 'from-red-500'
 
   return (
-    <div className={`rounded-2xl border overflow-hidden transition-all duration-200 bg-white/[0.02] ${border} ${isResolved ? 'opacity-50' : ''}`}>
+    <div className={`rounded-2xl border overflow-hidden transition-all duration-200 ${bg} ${border}`}>
 
-      {!isResolved && <div className={`h-px bg-gradient-to-r ${bar} to-transparent`} />}
+      {!isResolved && <div className={`h-0.5 bg-gradient-to-r ${bar} to-transparent opacity-60`} />}
 
       <div className="p-5">
 
         {/* topo */}
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <span className="flex items-center gap-1.5 text-[11px] text-slate-300 font-medium">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <span className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
             <Clock className="w-3 h-3" />
             <span title={formatFull(error.created_at)}>{timeAgo(error.created_at)}</span>
-            <span className="text-slate-300 mx-0.5">·</span>
+            <span className="mx-0.5">·</span>
             {formatFull(error.created_at)}
           </span>
 
           {isResolved ? (
-            <span className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Resolvido
-              {error.resolved_at && <span className="text-emerald-900">· {formatFull(error.resolved_at)}</span>}
-            </span>
+            <div className="flex flex-col items-end gap-0.5 shrink-0">
+              <span className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Resolvido
+              </span>
+              {error.resolved_at && (
+                <span className="text-[10px] text-slate-400">{formatFull(error.resolved_at)}</span>
+              )}
+              {error.resolved_by && (
+                <span className="text-[10px] text-slate-400">por <span className="text-slate-300 font-medium">{error.resolved_by}</span></span>
+              )}
+            </div>
           ) : (
             <button onClick={() => onResolve(error.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/8 border border-emerald-500/15 hover:bg-emerald-500/15 transition-colors">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
               <CheckCircle2 className="w-3.5 h-3.5" />
               Confirmar
             </button>
@@ -189,26 +198,35 @@ export default function ErrosN8n() {
     return () => { supabase.removeChannel(channel) }
   }, [load])
 
+  async function currentUserName(): Promise<string> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return 'Desconhecido'
+    const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+    return data?.full_name || user.email || 'Desconhecido'
+  }
+
   async function resolve(id: string) {
-    const now = new Date().toISOString()
+    const now  = new Date().toISOString()
+    const name = await currentUserName()
     const { error } = await supabase
       .from('n8n_errors')
-      .update({ resolved: true, resolved_at: now })
+      .update({ resolved: true, resolved_at: now, resolved_by: name })
       .eq('id', id)
     if (error) { setMsg('Erro ao confirmar.'); return }
-    setErrors(es => es.map(e => e.id === id ? { ...e, resolved: true, resolved_at: now } : e))
+    setErrors(es => es.map(e => e.id === id ? { ...e, resolved: true, resolved_at: now, resolved_by: name } : e))
   }
 
   async function resolveAll() {
     const ids = errors.filter(e => !e.resolved).map(e => e.id)
     if (!ids.length) return
-    const now = new Date().toISOString()
+    const now  = new Date().toISOString()
+    const name = await currentUserName()
     const { error } = await supabase
       .from('n8n_errors')
-      .update({ resolved: true, resolved_at: now })
+      .update({ resolved: true, resolved_at: now, resolved_by: name })
       .in('id', ids)
     if (error) { setMsg('Erro.'); return }
-    setErrors(es => es.map(e => ids.includes(e.id) ? { ...e, resolved: true, resolved_at: now } : e))
+    setErrors(es => es.map(e => ids.includes(e.id) ? { ...e, resolved: true, resolved_at: now, resolved_by: name } : e))
   }
 
   const abertos    = errors.filter(e => !e.resolved).length

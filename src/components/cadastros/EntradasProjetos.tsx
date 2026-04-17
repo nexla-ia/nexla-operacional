@@ -11,7 +11,7 @@ const EMPTY: Omit<ProjectEntry, 'id'> = {
 const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
   focus:border-indigo-500/40 transition-all hover:border-white/20`
-const labelCls = 'block text-xs font-medium text-slate-400 mb-1.5'
+const labelCls = 'block text-xs font-medium text-slate-300 mb-1.5'
 
 function fromDB(r: Record<string, unknown>): ProjectEntry {
   return {
@@ -42,7 +42,7 @@ function EntradaModal({ initial, editing, onSave, onClose }: {
             <div className="w-8 h-8 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/25 flex items-center justify-center"><ArrowDownCircle className="w-4 h-4 text-emerald-400" /></div>
             <h2 className="text-white font-semibold text-base">{editing ? 'Editar Entrada' : 'Nova Entrada'}</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.07] transition-colors"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.07] transition-colors"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={submit} className="px-7 py-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -53,7 +53,7 @@ function EntradaModal({ initial, editing, onSave, onClose }: {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelCls}>Valor (R$)</label>
-              <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm">R$</span>
+              <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm">R$</span>
                 <input className={inputCls + ' pl-9'} placeholder="0,00" value={form.valor} onChange={e => set('valor', maskBRL(e.target.value))} inputMode="numeric" required /></div></div>
             <div><label className={labelCls}>Data</label>
               <input type="date" className={inputCls + ' cursor-pointer'} value={form.data} onChange={e => set('data', e.target.value)} style={{ colorScheme: 'dark' }} required /></div>
@@ -62,7 +62,7 @@ function EntradaModal({ initial, editing, onSave, onClose }: {
             <div className="flex gap-2 mt-1">
               {(['pendente', 'recebido'] as const).map(s => (
                 <button key={s} type="button" onClick={() => set('status', s)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${form.status === s ? (s === 'recebido' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-amber-500/20 border-amber-500/40 text-amber-300') : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}>
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${form.status === s ? (s === 'recebido' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-amber-500/20 border-amber-500/40 text-amber-300') : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'}`}>
                   {s === 'recebido' ? 'Recebido' : 'Pendente'}
                 </button>
               ))}
@@ -71,7 +71,7 @@ function EntradaModal({ initial, editing, onSave, onClose }: {
             <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/25 disabled:opacity-60 hover:-translate-y-0.5 transition-all duration-300">
               {saving ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Salvando…</span> : editing ? 'Salvar' : 'Criar'}
             </button>
-            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl text-slate-400 text-sm bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors">Cancelar</button>
+            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl text-slate-300 text-sm bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors">Cancelar</button>
           </div>
         </form>
       </div>
@@ -133,7 +133,7 @@ export default function EntradasProjetos() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-white font-bold text-xl">Entradas de Projetos</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{loading ? 'Carregando…' : `Recebido: R$ ${numToMask(totalRecebido)} · Pendente: R$ ${numToMask(totalPendente)}`}</p>
+          <p className="text-slate-300 text-sm mt-0.5">{loading ? 'Carregando…' : `Recebido: R$ ${numToMask(totalRecebido)} · Pendente: R$ ${numToMask(totalPendente)}`}</p>
         </div>
         <button onClick={() => { setInitial(EMPTY); setEditId(null); setModal(true) }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 transition-all duration-300">
@@ -145,7 +145,7 @@ export default function EntradasProjetos() {
         <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 text-indigo-400 animate-spin" /></div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 text-center">
-          <ArrowDownCircle className="w-8 h-8 text-slate-500 mb-3" /><p className="text-slate-500 text-sm">Nenhuma entrada cadastrada</p>
+          <ArrowDownCircle className="w-8 h-8 text-slate-300 mb-3" /><p className="text-slate-300 text-sm">Nenhuma entrada cadastrada</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -156,12 +156,12 @@ export default function EntradasProjetos() {
               </button>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium truncate">{i.nome_projeto}</p>
-                <p className="text-slate-500 text-xs mt-0.5">{i.descricao || '—'}{i.data && ` · ${formatDate(i.data)}`}</p>
+                <p className="text-slate-300 text-xs mt-0.5">{i.descricao || '—'}{i.data && ` · ${formatDate(i.data)}`}</p>
               </div>
               <p className={`font-semibold text-sm shrink-0 ${i.status === 'recebido' ? 'text-emerald-400' : 'text-amber-400'}`}>R$ {i.valor}</p>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <button onClick={() => { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }} className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                <button onClick={() => del(i.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button onClick={() => { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }} className="p-1.5 rounded-lg text-slate-300 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => del(i.id)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           ))}

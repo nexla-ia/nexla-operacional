@@ -96,7 +96,7 @@ export default function FinanceiroBar() {
       label: 'Clientes',
       value: String(stats.clientes),
       icon: Users,
-      color: 'text-slate-400 bg-slate-500/10 ring-slate-500/20',
+      color: 'text-slate-300 bg-slate-500/10 ring-slate-500/20',
       textColor: 'text-slate-200',
     },
     {
@@ -130,10 +130,10 @@ export default function FinanceiroBar() {
                   <Icon className="w-3 h-3" />
                 </div>
                 <div className="leading-none">
-                  <p className={`text-xs font-semibold whitespace-nowrap ${loading ? 'text-slate-400' : m.textColor}`}>
+                  <p className={`text-xs font-semibold whitespace-nowrap ${loading ? 'text-slate-300' : m.textColor}`}>
                     {loading ? '—' : m.value}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">{m.label}</p>
+                  <p className="text-[10px] text-slate-300 mt-0.5 whitespace-nowrap">{m.label}</p>
                 </div>
               </div>
             )
@@ -143,14 +143,14 @@ export default function FinanceiroBar() {
         {/* refresh */}
         <div className="flex items-center gap-2 shrink-0 ml-1">
           {lastUpdated && !loading && (
-            <span className="text-[10px] text-slate-500 whitespace-nowrap hidden sm:block">
+            <span className="text-[10px] text-slate-300 whitespace-nowrap hidden sm:block">
               {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
           <button
             onClick={load}
             disabled={loading}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-300 hover:bg-white/[0.06] transition-colors disabled:opacity-40">
+            className="p-1.5 rounded-lg text-slate-300 hover:text-slate-300 hover:bg-white/[0.06] transition-colors disabled:opacity-40">
             {loading
               ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
               : <RefreshCw className="w-3.5 h-3.5" />}

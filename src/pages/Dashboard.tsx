@@ -116,7 +116,7 @@ export default function Dashboard() {
     transition-all duration-150
     ${activeSection === id
       ? 'nav-active bg-indigo-500/10 text-indigo-300'
-      : 'text-slate-500 hover:bg-white/[0.04] hover:text-slate-200'
+      : 'text-slate-300 hover:bg-white/[0.04] hover:text-slate-200'
     }
   `
 
@@ -141,7 +141,7 @@ export default function Dashboard() {
           </div>
           <div className="leading-tight">
             <p className="text-white font-bold text-sm tracking-tight">Nexla</p>
-            <p className="text-slate-400 text-[11px] font-medium">Operacional</p>
+            <p className="text-slate-300 text-[11px] font-medium">Operacional</p>
           </div>
         </div>
 
@@ -172,7 +172,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => toggleGroup(group.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-150 mt-3 mb-1
-                    ${hasActive ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-400'}`}
+                    ${hasActive ? 'text-indigo-400' : 'text-slate-300 hover:text-slate-300'}`}
                 >
                   <GroupIcon className="w-3.5 h-3.5 shrink-0" />
                   <span className="flex-1 text-left">{group.label}</span>
@@ -207,10 +207,10 @@ export default function Dashboard() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500/30 to-violet-500/20 ring-1 ring-indigo-500/20 flex items-center justify-center shrink-0">
               <span className="text-indigo-200 text-[10px] font-bold">{userInitials}</span>
             </div>
-            <span className="text-slate-500 text-xs truncate flex-1 font-medium">{user?.email}</span>
+            <span className="text-slate-300 text-xs truncate flex-1 font-medium">{user?.email}</span>
           </div>
           <button onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/8 hover:text-red-400 transition-all duration-150">
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-red-500/8 hover:text-red-400 transition-all duration-150">
             <LogOut className="w-3.5 h-3.5 shrink-0" />Sair
           </button>
         </div>
@@ -219,7 +219,7 @@ export default function Dashboard() {
       {/* ── Main ── */}
       <div className="flex flex-col flex-1 min-w-0">
         <header className="flex items-center gap-3 px-6 py-3.5 border-b border-white/[0.05] shrink-0 bg-[#080a0f]/60 backdrop-blur-sm">
-          <button onClick={() => setSidebarOpen(true)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-colors lg:hidden">
+          <button onClick={() => setSidebarOpen(true)} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors lg:hidden">
             <Menu className="w-5 h-5" />
           </button>
           <h2 className="text-white font-semibold text-sm tracking-tight">{SECTION_LABELS[activeSection] ?? 'Dashboard'}</h2>

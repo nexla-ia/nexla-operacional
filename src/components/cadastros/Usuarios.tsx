@@ -21,7 +21,7 @@ const ROLE_BADGE: Record<string, string> = {
 const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
   focus:border-indigo-500/40 transition-all hover:border-white/20`
-const labelCls = 'block text-xs font-medium text-slate-400 mb-1.5'
+const labelCls = 'block text-xs font-medium text-slate-300 mb-1.5'
 
 // ── Modal Novo Usuário ────────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ function NovoUsuarioModal({ onCreated, onClose }: { onCreated: () => void; onClo
             </div>
             <h2 className="text-white font-semibold text-base">Novo Usuário</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.07] transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.07] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -106,7 +106,7 @@ function NovoUsuarioModal({ onCreated, onClose }: { onCreated: () => void; onClo
             <div className="flex gap-2 mt-1">
               {ROLES.map(r => (
                 <button key={r.value} type="button" onClick={() => setRole(r.value as typeof role)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${role === r.value ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}>
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${role === r.value ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'}`}>
                   {r.label}
                 </button>
               ))}
@@ -120,7 +120,7 @@ function NovoUsuarioModal({ onCreated, onClose }: { onCreated: () => void; onClo
                 : 'Criar Usuário'}
             </button>
             <button type="button" onClick={onClose}
-              className="px-5 py-2.5 rounded-xl text-slate-400 text-sm bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors">
+              className="px-5 py-2.5 rounded-xl text-slate-300 text-sm bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors">
               Cancelar
             </button>
           </div>
@@ -166,7 +166,7 @@ export default function Usuarios() {
       <div className="flex items-center justify-between mb-6 animate-stagger-1">
         <div>
           <h1 className="text-white font-extrabold text-xl tracking-tight">Usuários</h1>
-          <p className="text-slate-400 text-sm mt-0.5 font-medium">
+          <p className="text-slate-300 text-sm mt-0.5 font-medium">
             {loading ? 'Carregando…' : `${profiles.length} usuário${profiles.length !== 1 ? 's' : ''}`}
           </p>
         </div>
@@ -187,10 +187,10 @@ export default function Usuarios() {
       ) : profiles.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-center">
           <div className="w-14 h-14 rounded-2xl bg-slate-900/80 ring-1 ring-white/10 flex items-center justify-center mb-4">
-            <UserCog className="w-6 h-6 text-slate-400" />
+            <UserCog className="w-6 h-6 text-slate-300" />
           </div>
-          <p className="text-slate-400 font-medium text-sm">Nenhum usuário cadastrado</p>
-          <p className="text-slate-400 text-xs mt-1">Clique em "Novo Usuário" para começar</p>
+          <p className="text-slate-300 font-medium text-sm">Nenhum usuário cadastrado</p>
+          <p className="text-slate-300 text-xs mt-1">Clique em "Novo Usuário" para começar</p>
         </div>
       ) : (
         <div className="space-y-1.5 animate-stagger-2">
@@ -201,20 +201,20 @@ export default function Usuarios() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium truncate">{p.full_name}</p>
-                <p className="text-slate-400 text-xs">{p.id.slice(0, 8)}…</p>
+                <p className="text-slate-300 text-xs">{p.id.slice(0, 8)}…</p>
               </div>
               {editId === p.id ? (
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1">
                     {ROLES.map(r => (
                       <button key={r.value} type="button" onClick={() => setEditRole(r.value)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${editRole === r.value ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}>
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${editRole === r.value ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'}`}>
                         {r.label}
                       </button>
                     ))}
                   </div>
                   <button onClick={() => saveRole(p.id)} className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 transition-colors"><Check className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setEditId(null)} className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setEditId(null)} className="p-1.5 rounded-lg bg-white/5 text-slate-300 hover:bg-white/10 transition-colors"><X className="w-3.5 h-3.5" /></button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -222,7 +222,7 @@ export default function Usuarios() {
                     {ROLES.find(r => r.value === p.role)?.label ?? p.role}
                   </span>
                   <button onClick={() => { setEditId(p.id); setEditRole(p.role) }}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors">
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors">
                     <UserCog className="w-3.5 h-3.5" />
                   </button>
                 </div>

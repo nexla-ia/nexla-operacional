@@ -83,7 +83,7 @@ export default function Financeiro() {
                 <Icon className="w-4 h-4" />
               </div>
               <p className={`text-xl font-bold ${textColors[card.color]}`}>R$ {numToMask(card.value)}</p>
-              <p className="text-slate-500 text-xs mt-1">{card.label}</p>
+              <p className="text-slate-300 text-xs mt-1">{card.label}</p>
             </div>
           )
         })}
@@ -93,7 +93,7 @@ export default function Financeiro() {
       <div>
         <h2 className="text-white font-semibold text-sm mb-3">Movimentações recentes</h2>
         {recent.length === 0 ? (
-          <p className="text-slate-400 text-sm text-center py-8">Nenhuma movimentação</p>
+          <p className="text-slate-300 text-sm text-center py-8">Nenhuma movimentação</p>
         ) : (
           <div className="space-y-2">
             {recent.map(item => (
@@ -103,7 +103,7 @@ export default function Financeiro() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-slate-200 text-sm truncate">{item.descricao}</p>
-                  {item.data && <p className="text-slate-400 text-xs">{formatDate(item.data)}</p>}
+                  {item.data && <p className="text-slate-300 text-xs">{formatDate(item.data)}</p>}
                 </div>
                 <p className={`font-semibold text-sm shrink-0 ${item.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>
                   {item.tipo === 'entrada' ? '+' : '-'} R$ {numToMask(item.valor)}

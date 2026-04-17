@@ -56,7 +56,7 @@ export default function LoginPage() {
               funciona de verdade.
             </span>
           </h1>
-          <p className="text-slate-400 text-base leading-relaxed max-w-sm">
+          <p className="text-slate-300 text-base leading-relaxed max-w-sm">
             Controle projetos, finanças, clientes e equipe em um único lugar. Simples, rápido e preciso.
           </p>
         </div>
@@ -70,7 +70,7 @@ export default function LoginPage() {
           ].map(s => (
             <div key={s.value} className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07]">
               <p className="text-white font-bold text-lg font-mono">{s.value}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{s.label}</p>
+              <p className="text-slate-300 text-xs mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -90,7 +90,7 @@ export default function LoginPage() {
           </div>
           <div>
             <p className="text-white font-bold text-sm">Nexla</p>
-            <p className="text-slate-500 text-xs">Operacional</p>
+            <p className="text-slate-300 text-xs">Operacional</p>
           </div>
         </div>
 
@@ -99,7 +99,7 @@ export default function LoginPage() {
 
           <div className="mb-8">
             <h2 className="text-white font-bold text-2xl tracking-tight">Acessar sistema</h2>
-            <p className="text-slate-500 text-sm mt-1.5">Entre com suas credenciais para continuar.</p>
+            <p className="text-slate-300 text-sm mt-1.5">Entre com suas credenciais para continuar.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -113,7 +113,7 @@ export default function LoginPage() {
 
             {/* Email */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                 E-mail
               </label>
               <input
@@ -129,7 +129,7 @@ export default function LoginPage() {
             {/* Senha */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Senha
                 </label>
                 <button type="button" className="text-xs text-indigo-400/70 hover:text-indigo-300 transition-colors font-medium">
@@ -148,7 +148,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors p-0.5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-300 transition-colors p-0.5"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -161,7 +161,7 @@ export default function LoginPage() {
                 type="checkbox"
                 className="w-4 h-4 rounded-md border-white/20 bg-white/5 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0 accent-indigo-500 cursor-pointer"
               />
-              <span className="text-sm text-slate-500 group-hover:text-slate-400 transition-colors select-none">
+              <span className="text-sm text-slate-300 group-hover:text-slate-300 transition-colors select-none">
                 Lembrar de mim
               </span>
             </label>
@@ -188,7 +188,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="relative z-10 text-center text-[11px] text-slate-500 mt-10">
+        <p className="relative z-10 text-center text-[11px] text-slate-300 mt-10">
           © {new Date().getFullYear()} Nexla Operacional
         </p>
       </div>

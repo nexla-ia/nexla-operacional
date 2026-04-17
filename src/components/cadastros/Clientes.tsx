@@ -25,13 +25,13 @@ function UFSelect({ value, onChange }: { value: string; onChange: (v: string) =>
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(o => !o)}
         className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-indigo-500/40 transition-all hover:border-white/20 flex items-center justify-between">
-        <span className={value ? 'text-white' : 'text-slate-500'}>{value || 'UF'}</span>
-        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className={value ? 'text-white' : 'text-slate-300'}>{value || 'UF'}</span>
+        <ChevronDown className={`w-4 h-4 text-slate-300 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-h-44 overflow-y-auto scrollbar-thin">
           <button type="button" onClick={() => { onChange(''); setOpen(false) }}
-            className="w-full text-left px-4 py-2 text-sm text-slate-500 hover:bg-white/10 transition-colors">
+            className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 transition-colors">
             Selecione...
           </button>
           {ESTADOS.map(uf => (
@@ -49,7 +49,7 @@ function UFSelect({ value, onChange }: { value: string; onChange: (v: string) =>
 const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
   focus:border-indigo-500/40 transition-all hover:border-white/20`
-const labelCls = 'block text-xs font-medium text-slate-400 mb-1.5'
+const labelCls = 'block text-xs font-medium text-slate-300 mb-1.5'
 
 function fromDB(r: Record<string, unknown>): Client {
   return {
@@ -91,7 +91,7 @@ function ClientModal({ initial, editing, onSave, onClose }: {
             </div>
             <h2 className="text-white font-semibold text-base">{editing ? 'Editar Cliente' : 'Novo Cliente'}</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.07] transition-colors"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.07] transition-colors"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={submit} className="px-7 py-6 space-y-4 max-h-[70vh] overflow-y-auto">
           {/* Tipo */}
@@ -99,7 +99,7 @@ function ClientModal({ initial, editing, onSave, onClose }: {
             {(['PF', 'PJ'] as const).map(t => (
               <button key={t} type="button" onClick={() => set('tipo', t)}
                 className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all
-                  ${form.tipo === t ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/20'}`}>
+                  ${form.tipo === t ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'}`}>
                 {t === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
               </button>
             ))}
@@ -139,7 +139,7 @@ function ClientModal({ initial, editing, onSave, onClose }: {
               {saving ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Salvando…</span> : editing ? 'Salvar' : 'Criar Cliente'}
             </button>
             <button type="button" onClick={onClose} disabled={saving}
-              className="px-5 py-2.5 rounded-xl text-slate-400 text-sm font-medium bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors disabled:opacity-50">
+              className="px-5 py-2.5 rounded-xl text-slate-300 text-sm font-medium bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors disabled:opacity-50">
               Cancelar
             </button>
           </div>
@@ -200,7 +200,7 @@ export default function Clientes() {
       <div className="flex items-center justify-between mb-6 animate-stagger-1">
         <div>
           <h1 className="text-white font-extrabold text-xl tracking-tight">Clientes</h1>
-          <p className="text-slate-400 text-sm mt-0.5 font-medium">
+          <p className="text-slate-300 text-sm mt-0.5 font-medium">
             {loading ? 'Carregando…' : `${clients.length} cliente${clients.length !== 1 ? 's' : ''}`}
           </p>
         </div>
@@ -218,10 +218,10 @@ export default function Clientes() {
       ) : clients.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-center animate-stagger-2">
           <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
-            <Users className="w-5 h-5 text-slate-500" />
+            <Users className="w-5 h-5 text-slate-300" />
           </div>
-          <p className="text-slate-400 font-semibold text-sm">Nenhum cliente cadastrado</p>
-          <p className="text-slate-500 text-xs mt-1 font-medium">Clique em "Novo Cliente" para começar</p>
+          <p className="text-slate-300 font-semibold text-sm">Nenhum cliente cadastrado</p>
+          <p className="text-slate-300 text-xs mt-1 font-medium">Clique em "Novo Cliente" para começar</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 animate-stagger-2">
@@ -234,19 +234,19 @@ export default function Clientes() {
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-white font-semibold text-sm truncate">{c.nome}</h3>
-                    {c.cpf_cnpj && <p className="text-slate-500 text-xs mt-0.5 font-medium font-mono">{c.cpf_cnpj}</p>}
+                    {c.cpf_cnpj && <p className="text-slate-300 text-xs mt-0.5 font-medium font-mono">{c.cpf_cnpj}</p>}
                   </div>
                 </div>
                 <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md ${c.tipo === 'PJ' ? 'bg-violet-500/10 text-violet-400 border border-violet-500/15' : 'bg-blue-500/10 text-blue-400 border border-blue-500/15'}`}>{c.tipo}</span>
               </div>
               <div className="space-y-1">
-                {c.email && <div className="flex items-center gap-2 text-slate-400 text-xs font-medium"><Mail className="w-3 h-3 shrink-0" /><span className="truncate">{c.email}</span></div>}
-                {c.telefone && <div className="flex items-center gap-2 text-slate-400 text-xs font-medium"><Phone className="w-3 h-3 shrink-0" /><span>{c.telefone}</span></div>}
-                {(c.cidade || c.estado) && <div className="flex items-center gap-2 text-slate-400 text-xs font-medium"><FileText className="w-3 h-3 shrink-0" /><span>{[c.cidade, c.estado].filter(Boolean).join(' · ')}</span></div>}
+                {c.email && <div className="flex items-center gap-2 text-slate-300 text-xs font-medium"><Mail className="w-3 h-3 shrink-0" /><span className="truncate">{c.email}</span></div>}
+                {c.telefone && <div className="flex items-center gap-2 text-slate-300 text-xs font-medium"><Phone className="w-3 h-3 shrink-0" /><span>{c.telefone}</span></div>}
+                {(c.cidade || c.estado) && <div className="flex items-center gap-2 text-slate-300 text-xs font-medium"><FileText className="w-3 h-3 shrink-0" /><span>{[c.cidade, c.estado].filter(Boolean).join(' · ')}</span></div>}
               </div>
               <div className="flex gap-1.5 pt-2 border-t border-white/[0.04] opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => openEdit(c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-indigo-500/10 text-xs font-semibold transition-colors"><Pencil className="w-3 h-3" />Editar</button>
-                <button onClick={() => del(c.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-colors"><Trash2 className="w-3 h-3" />Excluir</button>
+                <button onClick={() => openEdit(c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-indigo-300 hover:bg-indigo-500/10 text-xs font-semibold transition-colors"><Pencil className="w-3 h-3" />Editar</button>
+                <button onClick={() => del(c.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-colors"><Trash2 className="w-3 h-3" />Excluir</button>
               </div>
             </div>
           ))}

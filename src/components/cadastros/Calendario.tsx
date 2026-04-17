@@ -28,7 +28,7 @@ const TIPOS   : TipoEvento[] = ['projeto', 'mensalidade', 'reuniao', 'evento']
 const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
   focus:border-indigo-500/40 transition-all hover:border-white/20`
-const labelCls = 'block text-xs font-medium text-slate-400 mb-1.5'
+const labelCls = 'block text-xs font-medium text-slate-300 mb-1.5'
 
 // ── Modal: eventos do dia ─────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ function DayModal({ day, year, month, events, onClose, onAdd }: {
         {/* cabeçalho */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07]">
           <div>
-            <p className="text-slate-500 text-xs uppercase tracking-wide">{dayName}</p>
+            <p className="text-slate-300 text-xs uppercase tracking-wide">{dayName}</p>
             <p className="text-white font-bold text-lg mt-0.5">{formatDate(dateStr)}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -60,7 +60,7 @@ function DayModal({ day, year, month, events, onClose, onAdd }: {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-300 text-xs font-medium hover:bg-indigo-500/25 transition-colors">
               <Plus className="w-3.5 h-3.5" /> Adicionar
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.07] transition-colors">
+            <button onClick={onClose} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.07] transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -70,8 +70,8 @@ function DayModal({ day, year, month, events, onClose, onAdd }: {
         <div className="px-4 py-4 space-y-2 max-h-80 overflow-y-auto">
           {sorted.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 gap-2">
-              <CalIcon className="w-8 h-8 text-slate-500" />
-              <p className="text-slate-400 text-sm">Nenhum evento neste dia</p>
+              <CalIcon className="w-8 h-8 text-slate-300" />
+              <p className="text-slate-300 text-sm">Nenhum evento neste dia</p>
             </div>
           ) : sorted.map((e, i) => (
             <div key={i} className={`flex items-start gap-3 px-3 py-2.5 rounded-xl ${TIPO[e.tipo].bg} border ${TIPO[e.tipo].border}`}>
@@ -79,14 +79,14 @@ function DayModal({ day, year, month, events, onClose, onAdd }: {
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${TIPO[e.tipo].text}`}>{e.label}</p>
                 <div className="flex items-center gap-3 mt-0.5">
-                  <span className="text-slate-500 text-xs">{TIPO[e.tipo].label}</span>
+                  <span className="text-slate-300 text-xs">{TIPO[e.tipo].label}</span>
                   {e.time && (
-                    <span className="text-slate-500 text-xs flex items-center gap-1">
+                    <span className="text-slate-300 text-xs flex items-center gap-1">
                       <Clock className="w-3 h-3" />{e.time.slice(0, 5)}
                     </span>
                   )}
                 </div>
-                {e.description && <p className="text-slate-500 text-xs mt-1 line-clamp-2">{e.description}</p>}
+                {e.description && <p className="text-slate-300 text-xs mt-1 line-clamp-2">{e.description}</p>}
               </div>
             </div>
           ))}
@@ -141,7 +141,7 @@ function NovoEventoModal({ defaultDate, onCreated, onClose }: {
             </div>
             <h2 className="text-white font-semibold text-base">Novo Evento</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.07] transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.07] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -160,7 +160,7 @@ function NovoEventoModal({ defaultDate, onCreated, onClose }: {
                   className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all
                     ${tipo === t
                       ? `${TIPO[t].bg} ${TIPO[t].border} ${TIPO[t].text}`
-                      : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}>
+                      : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'}`}>
                   {TIPO[t].label}
                 </button>
               ))}
@@ -197,7 +197,7 @@ function NovoEventoModal({ defaultDate, onCreated, onClose }: {
                 : 'Salvar Evento'}
             </button>
             <button type="button" onClick={onClose}
-              className="px-5 py-2.5 rounded-xl text-slate-400 text-sm bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors">
+              className="px-5 py-2.5 rounded-xl text-slate-300 text-sm bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors">
               Cancelar
             </button>
           </div>
@@ -290,20 +290,20 @@ export default function Calendario() {
         <div className="flex items-center gap-3">
           <h1 className="text-white font-bold text-xl">Calendário</h1>
           <button onClick={goToday}
-            className="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 bg-white/[0.05] border border-white/[0.08] hover:text-white hover:bg-white/[0.08] transition-colors">
+            className="px-3 py-1 rounded-lg text-xs font-medium text-slate-300 bg-white/[0.05] border border-white/[0.08] hover:text-white hover:bg-white/[0.08] transition-colors">
             Hoje
           </button>
         </div>
         <div className="flex items-center gap-1.5">
           <button onClick={prev}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors">
+            className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-white font-semibold text-sm w-44 text-center select-none">
             {MONTHS[month]} {year}
           </span>
           <button onClick={next}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors">
+            className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors">
             <ChevronRight className="w-4 h-4" />
           </button>
           <button onClick={() => openAdd()}
@@ -320,7 +320,7 @@ export default function Calendario() {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
               ${filters[t]
                 ? `${TIPO[t].bg} ${TIPO[t].text} ${TIPO[t].border}`
-                : 'bg-transparent text-slate-400 border-white/[0.06] hover:border-white/10 hover:text-slate-400'}`}>
+                : 'bg-transparent text-slate-300 border-white/[0.06] hover:border-white/10 hover:text-slate-300'}`}>
             <span className={`w-2 h-2 rounded-full ${filters[t] ? TIPO[t].dot : 'bg-slate-700'}`} />
             {TIPO[t].label}
           </button>
@@ -332,7 +332,7 @@ export default function Calendario() {
         {/* dias da semana */}
         <div className="grid grid-cols-7 border-b border-white/[0.07]">
           {DAYS.map(d => (
-            <div key={d} className="py-3 text-center text-xs font-medium text-slate-500 select-none">{d}</div>
+            <div key={d} className="py-3 text-center text-xs font-medium text-slate-300 select-none">{d}</div>
           ))}
         </div>
 
@@ -364,7 +364,7 @@ export default function Calendario() {
                             ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/40'
                             : dayEvts.length > 0
                               ? 'text-white group-hover:bg-white/[0.08]'
-                              : 'text-slate-500 group-hover:bg-white/[0.08]'}`}>
+                              : 'text-slate-300 group-hover:bg-white/[0.08]'}`}>
                           {day}
                         </span>
                       </div>
@@ -381,7 +381,7 @@ export default function Calendario() {
                           </div>
                         ))}
                         {extra > 0 && (
-                          <p className="text-[10px] text-slate-500 px-1 leading-tight">+{extra} mais</p>
+                          <p className="text-[10px] text-slate-300 px-1 leading-tight">+{extra} mais</p>
                         )}
                       </div>
                     </>
@@ -404,7 +404,7 @@ export default function Calendario() {
               <>
                 <h2 className="text-white font-semibold text-sm mb-3">
                   Eventos de {MONTHS[month]}
-                  <span className="ml-2 text-slate-400 font-normal">({filtered.length})</span>
+                  <span className="ml-2 text-slate-300 font-normal">({filtered.length})</span>
                 </h2>
                 <div className="space-y-1.5">
                   {filtered.map((e, i) => (
@@ -414,14 +414,14 @@ export default function Calendario() {
                       <span className="text-slate-200 text-sm flex-1 truncate">{e.label}</span>
                       <div className="flex items-center gap-3 shrink-0">
                         {e.time && (
-                          <span className="text-slate-400 text-xs flex items-center gap-1">
+                          <span className="text-slate-300 text-xs flex items-center gap-1">
                             <Clock className="w-3 h-3" />{e.time.slice(0,5)}
                           </span>
                         )}
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${TIPO[e.tipo].bg} ${TIPO[e.tipo].text}`}>
                           {TIPO[e.tipo].label}
                         </span>
-                        <span className="text-slate-500 text-xs">{formatDate(e.date)}</span>
+                        <span className="text-slate-300 text-xs">{formatDate(e.date)}</span>
                       </div>
                     </div>
                   ))}
@@ -429,8 +429,8 @@ export default function Calendario() {
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-20 gap-2">
-                <CalIcon className="w-6 h-6 text-slate-500" />
-                <p className="text-slate-400 text-sm">Nenhum evento neste mês</p>
+                <CalIcon className="w-6 h-6 text-slate-300" />
+                <p className="text-slate-300 text-sm">Nenhum evento neste mês</p>
               </div>
             )
           })()}

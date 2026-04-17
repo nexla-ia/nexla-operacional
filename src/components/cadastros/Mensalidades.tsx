@@ -12,7 +12,7 @@ const EMPTY: Omit<Mensalidade, 'id'> = {
 const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
   placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
   focus:border-indigo-500/40 transition-all hover:border-white/20`
-const labelCls = 'block text-xs font-medium text-slate-400 mb-1.5'
+const labelCls = 'block text-xs font-medium text-slate-300 mb-1.5'
 
 function fromDB(r: Record<string, unknown>): Mensalidade {
   return {
@@ -51,10 +51,10 @@ function ClientSelect({ value, clienteNome, clients, onChange }: {
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(o => !o)}
         className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition-all hover:border-white/20 flex items-center justify-between">
-        <span className={selected ? 'text-white' : 'text-slate-500'}>
+        <span className={selected ? 'text-white' : 'text-slate-300'}>
           {selected ? selected.nome : clienteNome || 'Selecione o cliente…'}
         </span>
-        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-slate-300 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden">
@@ -65,14 +65,14 @@ function ClientSelect({ value, clienteNome, clients, onChange }: {
           </div>
           <div className="max-h-44 overflow-y-auto">
             {filtered.length === 0 && (
-              <p className="px-4 py-3 text-slate-500 text-xs">Nenhum cliente encontrado</p>
+              <p className="px-4 py-3 text-slate-300 text-xs">Nenhum cliente encontrado</p>
             )}
             {filtered.map(c => (
               <button key={c.id} type="button"
                 onClick={() => { onChange(c.id, c.nome); setOpen(false); setQ('') }}
                 className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-white/10 ${value === c.id ? 'text-indigo-300' : 'text-slate-300'}`}>
                 <span className="block font-medium">{c.nome}</span>
-                {c.telefone && <span className="text-slate-500 text-xs">{c.telefone}</span>}
+                {c.telefone && <span className="text-slate-300 text-xs">{c.telefone}</span>}
               </button>
             ))}
           </div>
@@ -107,7 +107,7 @@ function MensalidadeModal({ initial, editing, clients, onSave, onClose }: {
             </div>
             <h2 className="text-white font-semibold text-base">{editing ? 'Editar Mensalidade' : 'Nova Mensalidade'}</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.07] transition-colors"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.07] transition-colors"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={submit} className="px-7 py-6 space-y-4">
           {/* Cliente */}
@@ -127,7 +127,7 @@ function MensalidadeModal({ initial, editing, clients, onSave, onClose }: {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelCls}>Valor (R$)</label>
-              <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm">R$</span>
+              <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm">R$</span>
                 <input className={inputCls + ' pl-9'} placeholder="0,00" value={form.valor} onChange={e => set('valor', maskBRL(e.target.value))} inputMode="numeric" required /></div></div>
             <div><label className={labelCls}>Dia de Vencimento</label>
               <input type="number" min={1} max={31} className={inputCls} placeholder="Ex: 10" value={form.dia_vencimento} onChange={e => set('dia_vencimento', e.target.value)} required /></div>
@@ -139,7 +139,7 @@ function MensalidadeModal({ initial, editing, clients, onSave, onClose }: {
               <div className="flex gap-2 mt-1">
                 {(['ativo', 'inativo'] as const).map(s => (
                   <button key={s} type="button" onClick={() => set('status', s)}
-                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${form.status === s ? (s === 'ativo' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-slate-500/20 border-slate-500/40 text-slate-300') : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}>
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${form.status === s ? (s === 'ativo' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-slate-500/20 border-slate-500/40 text-slate-300') : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'}`}>
                     {s === 'ativo' ? 'Ativo' : 'Inativo'}
                   </button>
                 ))}
@@ -149,7 +149,7 @@ function MensalidadeModal({ initial, editing, clients, onSave, onClose }: {
             <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/25 disabled:opacity-60 hover:-translate-y-0.5 transition-all duration-300">
               {saving ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Salvando…</span> : editing ? 'Salvar' : 'Criar'}
             </button>
-            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl text-slate-400 text-sm bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors">Cancelar</button>
+            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl text-slate-300 text-sm bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors">Cancelar</button>
           </div>
         </form>
       </div>
@@ -226,7 +226,7 @@ export default function Mensalidades() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-white font-bold text-xl">Mensalidades</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{loading ? 'Carregando…' : `Recorrente mensal: R$ ${numToMask(totalAtivo)}`}</p>
+          <p className="text-slate-300 text-sm mt-0.5">{loading ? 'Carregando…' : `Recorrente mensal: R$ ${numToMask(totalAtivo)}`}</p>
         </div>
         <button onClick={() => { setInitial(EMPTY); setEditId(null); setModal(true) }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 transition-all duration-300">
@@ -238,26 +238,26 @@ export default function Mensalidades() {
         <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 text-indigo-400 animate-spin" /></div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 text-center">
-          <RefreshCw className="w-8 h-8 text-slate-500 mb-3" /><p className="text-slate-500 text-sm">Nenhuma mensalidade cadastrada</p>
+          <RefreshCw className="w-8 h-8 text-slate-300 mb-3" /><p className="text-slate-300 text-sm">Nenhuma mensalidade cadastrada</p>
         </div>
       ) : (
         <div className="space-y-2">
           {items.map(i => (
             <div key={i.id} className="group flex items-center gap-4 px-5 py-4 rounded-2xl bg-slate-900/70 border border-white/[0.07] hover:border-white/[0.13] transition-all">
               <button onClick={() => toggleStatus(i)} className="shrink-0">
-                {i.status === 'ativo' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <PauseCircle className="w-5 h-5 text-slate-400" />}
+                {i.status === 'ativo' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <PauseCircle className="w-5 h-5 text-slate-300" />}
               </button>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium truncate">{i.cliente_nome}</p>
-                <p className="text-slate-500 text-xs mt-0.5">
+                <p className="text-slate-300 text-xs mt-0.5">
                   {i.descricao} · vence dia {i.dia_vencimento}
                   {i.data_inicio && ` · desde ${formatDate(i.data_inicio)}`}
                 </p>
               </div>
-              <p className={`font-semibold text-sm shrink-0 ${i.status === 'ativo' ? 'text-emerald-400' : 'text-slate-500'}`}>R$ {i.valor}</p>
+              <p className={`font-semibold text-sm shrink-0 ${i.status === 'ativo' ? 'text-emerald-400' : 'text-slate-300'}`}>R$ {i.valor}</p>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <button onClick={() => { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }} className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                <button onClick={() => del(i.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button onClick={() => { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }} className="p-1.5 rounded-lg text-slate-300 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => del(i.id)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           ))}

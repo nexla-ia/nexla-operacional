@@ -182,10 +182,10 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
           <Layers className="w-5 h-5 text-amber-400" />
         </div>
         <p className="text-white font-semibold text-sm">Configuração pendente</p>
-        <p className="text-slate-500 text-xs max-w-xs">
+        <p className="text-slate-300 text-xs max-w-xs">
           Execute a migration <span className="text-amber-400 font-mono">010_kanban.sql</span> no Supabase SQL Editor para ativar o Kanban.
         </p>
-        <button onClick={load} className="mt-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm hover:bg-white/10 transition-colors">
+        <button onClick={load} className="mt-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-sm hover:bg-white/10 transition-colors">
           Tentar novamente
         </button>
       </div>
@@ -209,7 +209,7 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
           <div className="flex items-center gap-2.5 px-4 pt-4 pb-3 border-b border-white/[0.05]">
             <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${ACCENT_BY_POS[col.position] ?? 'bg-violet-500'}`} />
             <span className="text-white font-semibold text-sm flex-1 truncate">{col.title}</span>
-            <span className="text-xs text-slate-500 tabular-nums bg-white/5 px-2 py-0.5 rounded-full shrink-0">
+            <span className="text-xs text-slate-300 tabular-nums bg-white/5 px-2 py-0.5 rounded-full shrink-0">
               {col.tasks.length}
             </span>
           </div>
@@ -218,7 +218,7 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
           <div className="px-3 pt-3 pb-1 flex flex-col gap-2 min-h-[48px]">
             {col.tasks.length === 0 && addingTask !== col.id && (
               <div className={`flex items-center justify-center h-12 rounded-xl border-2 border-dashed text-xs transition-colors
-                ${dragOverCol === col.id ? 'border-indigo-500/50 text-indigo-400' : 'border-white/[0.06] text-slate-500'}`}>
+                ${dragOverCol === col.id ? 'border-indigo-500/50 text-indigo-400' : 'border-white/[0.06] text-slate-300'}`}>
                 {dragOverCol === col.id ? 'Soltar aqui' : 'Sem tarefas'}
               </div>
             )}
@@ -248,14 +248,14 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
                     Adicionar
                   </button>
                   <button onClick={() => { setAddingTask(null); setNewTaskTitle('') }}
-                    className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 transition-colors">
+                    className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
             ) : (
               <button onClick={() => { setAddingTask(col.id); setNewTaskTitle('') }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] transition-all text-sm">
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:text-slate-300 hover:bg-white/[0.04] transition-all text-sm">
                 <Plus className="w-4 h-4" />Adicionar tarefa
               </button>
             )}
@@ -282,14 +282,14 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
                 Criar coluna
               </button>
               <button onClick={() => { setAddingColumn(false); setNewColTitle('') }}
-                className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 transition-colors">
+                className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         ) : (
           <button onClick={() => setAddingColumn(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl border-2 border-dashed border-white/[0.08] text-slate-500 hover:text-slate-300 hover:border-white/[0.18] transition-all text-sm font-medium">
+            className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-2xl border-2 border-dashed border-white/[0.08] text-slate-300 hover:text-slate-300 hover:border-white/[0.18] transition-all text-sm font-medium">
             <Plus className="w-4 h-4" />Adicionar coluna
           </button>
         )}
@@ -314,7 +314,7 @@ function TaskCard({ task, onRemove, onDragStart }: {
       <div className="flex-1 min-w-0">
         <span className="text-slate-200 text-sm leading-snug break-words block">{task.title}</span>
         {task.subtitle && (
-          <span className="text-slate-500 text-xs mt-0.5 block truncate">{task.subtitle}</span>
+          <span className="text-slate-300 text-xs mt-0.5 block truncate">{task.subtitle}</span>
         )}
         {task.fromProject && (
           <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-md">
@@ -323,7 +323,7 @@ function TaskCard({ task, onRemove, onDragStart }: {
         )}
       </div>
       <button onClick={onRemove}
-        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-400 mt-0.5 shrink-0">
+        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-red-400 mt-0.5 shrink-0">
         <X className="w-3.5 h-3.5" />
       </button>
     </div>

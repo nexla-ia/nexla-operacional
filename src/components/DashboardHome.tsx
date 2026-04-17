@@ -84,11 +84,11 @@ export default function DashboardHome() {
       {/* ── Cabeçalho ── */}
       <div className="flex items-end justify-between animate-stagger-1">
         <div>
-          <p className="text-slate-400 text-xs font-medium mb-1 uppercase tracking-widest">{dateStr}</p>
+          <p className="text-slate-300 text-xs font-medium mb-1 uppercase tracking-widest">{dateStr}</p>
           <h1 className="text-white font-extrabold text-2xl tracking-tight">Visão Geral</h1>
         </div>
         <button onClick={load}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium bg-white/[0.03] border border-white/[0.06] hover:text-white hover:bg-white/[0.07] transition-all">
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-300 text-xs font-medium bg-white/[0.03] border border-white/[0.06] hover:text-white hover:bg-white/[0.07] transition-all">
           <RefreshCw className="w-3 h-3" /> Atualizar
         </button>
       </div>
@@ -110,10 +110,10 @@ export default function DashboardHome() {
             <p className={`text-4xl font-extrabold tracking-tight font-numeric mb-1 ${positive ? 'text-emerald-300' : 'text-red-300'}`}>
               R$ {numToMask(stats.saldo)}
             </p>
-            <p className="text-slate-400 text-xs font-medium">entradas − despesas</p>
+            <p className="text-slate-300 text-xs font-medium">entradas − despesas</p>
             {total > 0 && (
               <div className="mt-5 space-y-1.5">
-                <div className="flex text-[10px] text-slate-400 justify-between font-medium">
+                <div className="flex text-[10px] text-slate-300 justify-between font-medium">
                   <span>Ent. {pctEnt.toFixed(0)}%</span>
                   <span>Desp. {pctDesp.toFixed(0)}%</span>
                 </div>
@@ -140,7 +140,7 @@ export default function DashboardHome() {
                 <p className={`text-2xl font-extrabold font-numeric tracking-tight ${c.color}`}>
                   R$ {numToMask(c.value)}
                 </p>
-                <p className="text-slate-400 text-xs font-medium mt-1">{c.label} <span className="text-slate-500">· {c.sub}</span></p>
+                <p className="text-slate-300 text-xs font-medium mt-1">{c.label} <span className="text-slate-300">· {c.sub}</span></p>
               </div>
             </div>
           ))}
@@ -158,7 +158,7 @@ export default function DashboardHome() {
             <c.Icon className={`w-4 h-4 shrink-0 ${c.color} opacity-60`} />
             <div>
               <p className={`text-xl font-extrabold font-numeric ${c.color}`}>{c.value}</p>
-              <p className="text-slate-500 text-xs font-medium">{c.label}</p>
+              <p className="text-slate-300 text-xs font-medium">{c.label}</p>
             </div>
           </div>
         ))}
@@ -168,12 +168,12 @@ export default function DashboardHome() {
       <div className="animate-stagger-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-white font-bold text-sm tracking-tight">Movimentações recentes</h2>
-          <span className="text-slate-500 text-xs font-medium">{recent.length} registros</span>
+          <span className="text-slate-300 text-xs font-medium">{recent.length} registros</span>
         </div>
 
         {recent.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-20 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
-            <p className="text-slate-500 text-sm font-medium">Nenhuma movimentação</p>
+            <p className="text-slate-300 text-sm font-medium">Nenhuma movimentação</p>
           </div>
         ) : (
           <div className="rounded-2xl bg-white/[0.02] border border-white/[0.05] overflow-hidden">
@@ -189,7 +189,7 @@ export default function DashboardHome() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-slate-300 text-sm font-medium truncate">{item.descricao}</p>
-                  {item.data && <p className="text-slate-500 text-xs mt-0.5 font-medium">{formatDate(item.data)}</p>}
+                  {item.data && <p className="text-slate-300 text-xs mt-0.5 font-medium">{formatDate(item.data)}</p>}
                 </div>
                 <p className={`font-bold text-sm font-numeric shrink-0 ${item.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>
                   {item.tipo === 'entrada' ? '+' : '−'} R$ {numToMask(item.valor)}

@@ -82,15 +82,24 @@ const SECTION_LABELS: Record<string, string> = {
 export default function Dashboard() {
   const navigate = useNavigate()
   const [user, setUser]                   = useState<User | null>(null)
+  const [role, setRole]                   = useState<'admin' | 'operator' | null>(null)
   const [activeSection, setActiveSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen]     = useState(false)
   const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['cadastros', 'financeiro']))
   const [pendingKanbanTask, setPendingKanbanTask] = useState<{ title: string; subtitle?: string } | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) navigate('/')
-      else setUser(data.user)
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) { navigate('/'); return }
+      setUser(data.user)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+      const r = (profile?.role as 'admin' | 'operator') ?? 'operator'
+      setRole(r)
+      if (r === 'operator') setActiveSection('projetos')
     })
   }, [navigate])
 
@@ -108,6 +117,11 @@ export default function Dashboard() {
   }
 
   function selectLeaf(id: string) { setActiveSection(id); setSidebarOpen(false) }
+
+  const RESTRICTED = new Set(['dashboard', 'cadastros', 'financeiro'])
+  const visibleNav = role === 'operator'
+    ? NAV.filter(item => !RESTRICTED.has(item.id))
+    : NAV
 
   const userInitials = user?.email ? user.email.slice(0, 2).toUpperCase() : '??'
 
@@ -147,7 +161,7 @@ export default function Dashboard() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-2.5 py-4 space-y-0.5">
-          {NAV.map(item => {
+          {visibleNav.map(item => {
             if (item.type === 'leaf') {
               const Icon = item.icon
               const isActive = activeSection === item.id

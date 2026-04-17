@@ -145,7 +145,7 @@ export default function EntradasProjetos() {
         <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 text-indigo-400 animate-spin" /></div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 text-center">
-          <ArrowDownCircle className="w-8 h-8 text-slate-700 mb-3" /><p className="text-slate-500 text-sm">Nenhuma entrada cadastrada</p>
+          <ArrowDownCircle className="w-8 h-8 text-slate-500 mb-3" /><p className="text-slate-500 text-sm">Nenhuma entrada cadastrada</p>
         </div>
       ) : (
         <div className="space-y-2">

@@ -70,7 +70,7 @@ export default function LoginPage() {
           ].map(s => (
             <div key={s.value} className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07]">
               <p className="text-white font-bold text-lg font-mono">{s.value}</p>
-              <p className="text-slate-600 text-xs mt-0.5">{s.label}</p>
+              <p className="text-slate-400 text-xs mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -148,7 +148,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 transition-colors p-0.5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors p-0.5"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -188,7 +188,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="relative z-10 text-center text-[11px] text-slate-700 mt-10">
+        <p className="relative z-10 text-center text-[11px] text-slate-500 mt-10">
           © {new Date().getFullYear()} Nexla Operacional
         </p>
       </div>

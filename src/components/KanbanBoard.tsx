@@ -218,7 +218,7 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
           <div className="px-3 pt-3 pb-1 flex flex-col gap-2 min-h-[48px]">
             {col.tasks.length === 0 && addingTask !== col.id && (
               <div className={`flex items-center justify-center h-12 rounded-xl border-2 border-dashed text-xs transition-colors
-                ${dragOverCol === col.id ? 'border-indigo-500/50 text-indigo-400' : 'border-white/[0.06] text-slate-700'}`}>
+                ${dragOverCol === col.id ? 'border-indigo-500/50 text-indigo-400' : 'border-white/[0.06] text-slate-500'}`}>
                 {dragOverCol === col.id ? 'Soltar aqui' : 'Sem tarefas'}
               </div>
             )}
@@ -323,7 +323,7 @@ function TaskCard({ task, onRemove, onDragStart }: {
         )}
       </div>
       <button onClick={onRemove}
-        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400 mt-0.5 shrink-0">
+        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-400 mt-0.5 shrink-0">
         <X className="w-3.5 h-3.5" />
       </button>
     </div>

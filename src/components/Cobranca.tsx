@@ -227,11 +227,11 @@ export default function Cobranca() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-center">
-          <MessageCircle className="w-10 h-10 text-slate-700 mb-4" />
+          <MessageCircle className="w-10 h-10 text-slate-500 mb-4" />
           <p className="text-slate-400 font-medium text-sm">
             {rows.length === 0 ? 'Nenhum cliente com pendências' : 'Nenhum resultado'}
           </p>
-          <p className="text-slate-600 text-xs mt-1">
+          <p className="text-slate-400 text-xs mt-1">
             {rows.length === 0
               ? 'Cadastre mensalidades ou entradas de projetos pendentes'
               : 'Tente outro nome ou telefone'}
@@ -303,7 +303,7 @@ export default function Cobranca() {
                             <span className="text-base">{item.tipo === 'mensalidade' ? '🔄' : '💼'}</span>
                             <div>
                               <p className="text-slate-200 text-xs font-medium">{item.descricao}</p>
-                              {item.detalhe && <p className="text-slate-600 text-[10px]">{item.detalhe}</p>}
+                              {item.detalhe && <p className="text-slate-400 text-[10px]">{item.detalhe}</p>}
                             </div>
                           </div>
                           <span className="text-red-400 text-xs font-semibold">R$ {numToMask(item.valor)}</span>
@@ -344,7 +344,7 @@ export default function Cobranca() {
                         </button>
                       ) : (
                         <div className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
-                                       bg-slate-800/50 border border-white/[0.05] text-slate-600 text-sm cursor-not-allowed">
+                                       bg-slate-800/50 border border-white/[0.05] text-slate-400 text-sm cursor-not-allowed">
                           <Phone className="w-4 h-4" />
                           Sem telefone cadastrado
                         </div>

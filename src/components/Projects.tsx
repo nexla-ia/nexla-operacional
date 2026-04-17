@@ -262,13 +262,13 @@ function ProjectCard({ project, onEdit, onDelete }: CardProps) {
       <div className="grid grid-cols-2 gap-2.5">
         {project.numero_cliente && (
           <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-            <Phone className="w-3 h-3 shrink-0 text-slate-600" />
+            <Phone className="w-3 h-3 shrink-0 text-slate-400" />
             <span className="truncate">{project.numero_cliente}</span>
           </div>
         )}
         {project.valor && (
           <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-            <DollarSign className="w-3 h-3 shrink-0 text-slate-600" />
+            <DollarSign className="w-3 h-3 shrink-0 text-slate-400" />
             <span className="truncate font-medium text-emerald-400">
               R$ {project.valor}
             </span>
@@ -276,13 +276,13 @@ function ProjectCard({ project, onEdit, onDelete }: CardProps) {
         )}
         {project.data_termino && (
           <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-            <Calendar className="w-3 h-3 shrink-0 text-slate-600" />
+            <Calendar className="w-3 h-3 shrink-0 text-slate-400" />
             <span>{formatDate(project.data_termino)}</span>
           </div>
         )}
         {project.nome_cliente && (
           <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-            <User className="w-3 h-3 shrink-0 text-slate-600" />
+            <User className="w-3 h-3 shrink-0 text-slate-400" />
             <span className="truncate">{project.nome_cliente}</span>
           </div>
         )}
@@ -438,10 +438,10 @@ export default function Projects({ onProjectCreated }: ProjectsProps) {
       ) : projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-center">
           <div className="w-14 h-14 rounded-2xl bg-slate-900/80 ring-1 ring-white/10 flex items-center justify-center mb-4">
-            <FolderKanban className="w-6 h-6 text-slate-600" />
+            <FolderKanban className="w-6 h-6 text-slate-400" />
           </div>
           <p className="text-slate-400 font-medium text-sm">Nenhum projeto ainda</p>
-          <p className="text-slate-600 text-xs mt-1">Clique em "Novo Projeto" para começar</p>
+          <p className="text-slate-400 text-xs mt-1">Clique em "Novo Projeto" para começar</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

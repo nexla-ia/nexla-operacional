@@ -141,7 +141,7 @@ export default function Dashboard() {
           </div>
           <div className="leading-tight">
             <p className="text-white font-bold text-sm tracking-tight">Nexla</p>
-            <p className="text-slate-600 text-[11px] font-medium">Operacional</p>
+            <p className="text-slate-400 text-[11px] font-medium">Operacional</p>
           </div>
         </div>
 
@@ -172,7 +172,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => toggleGroup(group.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-150 mt-3 mb-1
-                    ${hasActive ? 'text-indigo-400' : 'text-slate-600 hover:text-slate-400'}`}
+                    ${hasActive ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-400'}`}
                 >
                   <GroupIcon className="w-3.5 h-3.5 shrink-0" />
                   <span className="flex-1 text-left">{group.label}</span>
@@ -210,7 +210,7 @@ export default function Dashboard() {
             <span className="text-slate-500 text-xs truncate flex-1 font-medium">{user?.email}</span>
           </div>
           <button onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-red-500/8 hover:text-red-400 transition-all duration-150">
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-red-500/8 hover:text-red-400 transition-all duration-150">
             <LogOut className="w-3.5 h-3.5 shrink-0" />Sair
           </button>
         </div>

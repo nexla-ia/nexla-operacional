@@ -200,7 +200,7 @@ export default function Clientes() {
       <div className="flex items-center justify-between mb-6 animate-stagger-1">
         <div>
           <h1 className="text-white font-extrabold text-xl tracking-tight">Clientes</h1>
-          <p className="text-slate-600 text-sm mt-0.5 font-medium">
+          <p className="text-slate-400 text-sm mt-0.5 font-medium">
             {loading ? 'Carregando…' : `${clients.length} cliente${clients.length !== 1 ? 's' : ''}`}
           </p>
         </div>
@@ -218,10 +218,10 @@ export default function Clientes() {
       ) : clients.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-center animate-stagger-2">
           <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
-            <Users className="w-5 h-5 text-slate-700" />
+            <Users className="w-5 h-5 text-slate-500" />
           </div>
           <p className="text-slate-400 font-semibold text-sm">Nenhum cliente cadastrado</p>
-          <p className="text-slate-700 text-xs mt-1 font-medium">Clique em "Novo Cliente" para começar</p>
+          <p className="text-slate-500 text-xs mt-1 font-medium">Clique em "Novo Cliente" para começar</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 animate-stagger-2">
@@ -234,15 +234,15 @@ export default function Clientes() {
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-white font-semibold text-sm truncate">{c.nome}</h3>
-                    {c.cpf_cnpj && <p className="text-slate-700 text-xs mt-0.5 font-medium font-mono">{c.cpf_cnpj}</p>}
+                    {c.cpf_cnpj && <p className="text-slate-500 text-xs mt-0.5 font-medium font-mono">{c.cpf_cnpj}</p>}
                   </div>
                 </div>
                 <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md ${c.tipo === 'PJ' ? 'bg-violet-500/10 text-violet-400 border border-violet-500/15' : 'bg-blue-500/10 text-blue-400 border border-blue-500/15'}`}>{c.tipo}</span>
               </div>
               <div className="space-y-1">
-                {c.email && <div className="flex items-center gap-2 text-slate-600 text-xs font-medium"><Mail className="w-3 h-3 shrink-0" /><span className="truncate">{c.email}</span></div>}
-                {c.telefone && <div className="flex items-center gap-2 text-slate-600 text-xs font-medium"><Phone className="w-3 h-3 shrink-0" /><span>{c.telefone}</span></div>}
-                {(c.cidade || c.estado) && <div className="flex items-center gap-2 text-slate-600 text-xs font-medium"><FileText className="w-3 h-3 shrink-0" /><span>{[c.cidade, c.estado].filter(Boolean).join(' · ')}</span></div>}
+                {c.email && <div className="flex items-center gap-2 text-slate-400 text-xs font-medium"><Mail className="w-3 h-3 shrink-0" /><span className="truncate">{c.email}</span></div>}
+                {c.telefone && <div className="flex items-center gap-2 text-slate-400 text-xs font-medium"><Phone className="w-3 h-3 shrink-0" /><span>{c.telefone}</span></div>}
+                {(c.cidade || c.estado) && <div className="flex items-center gap-2 text-slate-400 text-xs font-medium"><FileText className="w-3 h-3 shrink-0" /><span>{[c.cidade, c.estado].filter(Boolean).join(' · ')}</span></div>}
               </div>
               <div className="flex gap-1.5 pt-2 border-t border-white/[0.04] opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => openEdit(c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-indigo-500/10 text-xs font-semibold transition-colors"><Pencil className="w-3 h-3" />Editar</button>

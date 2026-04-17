@@ -70,8 +70,8 @@ function DayModal({ day, year, month, events, onClose, onAdd }: {
         <div className="px-4 py-4 space-y-2 max-h-80 overflow-y-auto">
           {sorted.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 gap-2">
-              <CalIcon className="w-8 h-8 text-slate-700" />
-              <p className="text-slate-600 text-sm">Nenhum evento neste dia</p>
+              <CalIcon className="w-8 h-8 text-slate-500" />
+              <p className="text-slate-400 text-sm">Nenhum evento neste dia</p>
             </div>
           ) : sorted.map((e, i) => (
             <div key={i} className={`flex items-start gap-3 px-3 py-2.5 rounded-xl ${TIPO[e.tipo].bg} border ${TIPO[e.tipo].border}`}>
@@ -320,7 +320,7 @@ export default function Calendario() {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
               ${filters[t]
                 ? `${TIPO[t].bg} ${TIPO[t].text} ${TIPO[t].border}`
-                : 'bg-transparent text-slate-600 border-white/[0.06] hover:border-white/10 hover:text-slate-400'}`}>
+                : 'bg-transparent text-slate-400 border-white/[0.06] hover:border-white/10 hover:text-slate-400'}`}>
             <span className={`w-2 h-2 rounded-full ${filters[t] ? TIPO[t].dot : 'bg-slate-700'}`} />
             {TIPO[t].label}
           </button>
@@ -404,7 +404,7 @@ export default function Calendario() {
               <>
                 <h2 className="text-white font-semibold text-sm mb-3">
                   Eventos de {MONTHS[month]}
-                  <span className="ml-2 text-slate-600 font-normal">({filtered.length})</span>
+                  <span className="ml-2 text-slate-400 font-normal">({filtered.length})</span>
                 </h2>
                 <div className="space-y-1.5">
                   {filtered.map((e, i) => (
@@ -414,7 +414,7 @@ export default function Calendario() {
                       <span className="text-slate-200 text-sm flex-1 truncate">{e.label}</span>
                       <div className="flex items-center gap-3 shrink-0">
                         {e.time && (
-                          <span className="text-slate-600 text-xs flex items-center gap-1">
+                          <span className="text-slate-400 text-xs flex items-center gap-1">
                             <Clock className="w-3 h-3" />{e.time.slice(0,5)}
                           </span>
                         )}
@@ -429,8 +429,8 @@ export default function Calendario() {
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-20 gap-2">
-                <CalIcon className="w-6 h-6 text-slate-700" />
-                <p className="text-slate-600 text-sm">Nenhum evento neste mês</p>
+                <CalIcon className="w-6 h-6 text-slate-500" />
+                <p className="text-slate-400 text-sm">Nenhum evento neste mês</p>
               </div>
             )
           })()}

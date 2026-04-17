@@ -238,14 +238,14 @@ export default function Mensalidades() {
         <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 text-indigo-400 animate-spin" /></div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 text-center">
-          <RefreshCw className="w-8 h-8 text-slate-700 mb-3" /><p className="text-slate-500 text-sm">Nenhuma mensalidade cadastrada</p>
+          <RefreshCw className="w-8 h-8 text-slate-500 mb-3" /><p className="text-slate-500 text-sm">Nenhuma mensalidade cadastrada</p>
         </div>
       ) : (
         <div className="space-y-2">
           {items.map(i => (
             <div key={i.id} className="group flex items-center gap-4 px-5 py-4 rounded-2xl bg-slate-900/70 border border-white/[0.07] hover:border-white/[0.13] transition-all">
               <button onClick={() => toggleStatus(i)} className="shrink-0">
-                {i.status === 'ativo' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <PauseCircle className="w-5 h-5 text-slate-600" />}
+                {i.status === 'ativo' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <PauseCircle className="w-5 h-5 text-slate-400" />}
               </button>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium truncate">{i.cliente_nome}</p>

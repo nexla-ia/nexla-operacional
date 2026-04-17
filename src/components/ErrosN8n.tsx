@@ -120,10 +120,10 @@ function ErrorCard({ error, onResolve }: {
 
         {/* topo */}
         <div className="flex items-center justify-between gap-3 mb-4">
-          <span className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
+          <span className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
             <Clock className="w-3 h-3" />
             <span title={formatFull(error.created_at)}>{timeAgo(error.created_at)}</span>
-            <span className="text-slate-800 mx-0.5">·</span>
+            <span className="text-slate-400 mx-0.5">·</span>
             {formatFull(error.created_at)}
           </span>
 
@@ -242,7 +242,7 @@ export default function ErrosN8n() {
               </span>
             )}
           </div>
-          <p className="text-slate-600 text-sm font-medium">Monitoramento em tempo real dos fluxos n8n</p>
+          <p className="text-slate-400 text-sm font-medium">Monitoramento em tempo real dos fluxos n8n</p>
         </div>
         <div className="flex items-center gap-2">
           {abertos > 0 && filter !== 'resolvidos' && (
@@ -273,9 +273,9 @@ export default function ErrosN8n() {
                 ? f.id === 'abertos'    ? 'bg-red-500/10 text-red-300 border-red-500/20'
                 : f.id === 'resolvidos' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
                 :                        'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'
-                : 'text-slate-600 border-transparent hover:text-slate-300 hover:border-white/[0.06]'}`}>
+                : 'text-slate-400 border-transparent hover:text-slate-300 hover:border-white/[0.06]'}`}>
             {f.label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${filter === f.id ? 'bg-white/10' : 'bg-white/[0.04] text-slate-700'}`}>
+            <span className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${filter === f.id ? 'bg-white/10' : 'bg-white/[0.04] text-slate-500'}`}>
               {f.count}
             </span>
           </button>
@@ -291,15 +291,15 @@ export default function ErrosN8n() {
         <div className="flex flex-col items-center justify-center h-48 text-center animate-stagger-3">
           <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
             {filter === 'resolvidos'
-              ? <CheckCircle2 className="w-5 h-5 text-slate-700" />
-              : <AlertTriangle className="w-5 h-5 text-slate-700" />}
+              ? <CheckCircle2 className="w-5 h-5 text-slate-500" />
+              : <AlertTriangle className="w-5 h-5 text-slate-500" />}
           </div>
           <p className="text-slate-500 font-semibold text-sm">
             {filter === 'abertos'    && 'Nenhum erro em aberto'}
             {filter === 'resolvidos' && 'Nenhum erro resolvido'}
             {filter === 'todos'      && 'Nenhum erro registrado'}
           </p>
-          {filter === 'abertos' && <p className="text-slate-700 text-xs mt-1">Tudo funcionando normalmente.</p>}
+          {filter === 'abertos' && <p className="text-slate-500 text-xs mt-1">Tudo funcionando normalmente.</p>}
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 animate-stagger-3">

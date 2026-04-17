@@ -166,7 +166,7 @@ export default function Usuarios() {
       <div className="flex items-center justify-between mb-6 animate-stagger-1">
         <div>
           <h1 className="text-white font-extrabold text-xl tracking-tight">Usuários</h1>
-          <p className="text-slate-600 text-sm mt-0.5 font-medium">
+          <p className="text-slate-400 text-sm mt-0.5 font-medium">
             {loading ? 'Carregando…' : `${profiles.length} usuário${profiles.length !== 1 ? 's' : ''}`}
           </p>
         </div>
@@ -187,10 +187,10 @@ export default function Usuarios() {
       ) : profiles.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-center">
           <div className="w-14 h-14 rounded-2xl bg-slate-900/80 ring-1 ring-white/10 flex items-center justify-center mb-4">
-            <UserCog className="w-6 h-6 text-slate-600" />
+            <UserCog className="w-6 h-6 text-slate-400" />
           </div>
           <p className="text-slate-400 font-medium text-sm">Nenhum usuário cadastrado</p>
-          <p className="text-slate-600 text-xs mt-1">Clique em "Novo Usuário" para começar</p>
+          <p className="text-slate-400 text-xs mt-1">Clique em "Novo Usuário" para começar</p>
         </div>
       ) : (
         <div className="space-y-1.5 animate-stagger-2">
@@ -201,7 +201,7 @@ export default function Usuarios() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium truncate">{p.full_name}</p>
-                <p className="text-slate-600 text-xs">{p.id.slice(0, 8)}…</p>
+                <p className="text-slate-400 text-xs">{p.id.slice(0, 8)}…</p>
               </div>
               {editId === p.id ? (
                 <div className="flex items-center gap-2">
@@ -222,7 +222,7 @@ export default function Usuarios() {
                     {ROLES.find(r => r.value === p.role)?.label ?? p.role}
                   </span>
                   <button onClick={() => { setEditId(p.id); setEditRole(p.role) }}
-                    className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors">
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors">
                     <UserCog className="w-3.5 h-3.5" />
                   </button>
                 </div>

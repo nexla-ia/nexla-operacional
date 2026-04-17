@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, X, Layers, Loader2 } from 'lucide-react'
+import { Plus, X, Layers, Loader2, GripVertical } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 interface Task {
@@ -39,12 +39,14 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
   const [migrationPending, setMigrationPending] = useState(false)
   const [addingColumn, setAddingColumn] = useState(false)
   const [newColTitle, setNewColTitle]   = useState('')
-  const [dragOverCol, setDragOverCol]   = useState<string | null>(null)
-  const dragRef = useRef<{ taskId: string; fromColId: string } | null>(null)
+  const [dragOverCol,        setDragOverCol]        = useState<string | null>(null)
+  const [dragOverColReorder, setDragOverColReorder] = useState<string | null>(null)
+
+  const dragTaskRef = useRef<{ taskId: string; fromColId: string } | null>(null)
+  const dragColRef  = useRef<string | null>(null)
 
   useEffect(() => { load() }, [])
 
-  // Quando projeto criado chega E colunas já estão carregadas → insere no banco
   useEffect(() => {
     if (!pendingTask || loading || columns.length === 0) return
     const firstCol = [...columns].sort((a, b) => a.position - b.position)[0]
@@ -63,14 +65,12 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
     let { data: cols, error: colsErr } = await supabase
       .from('kanban_columns').select('*').order('position')
 
-    // Tabela não existe ainda (migration 010 não rodou)
     if (colsErr) {
       setMigrationPending(true)
       setLoading(false)
       return
     }
 
-    // Semeia colunas padrão na primeira execução
     if (!cols || cols.length === 0) {
       const { data: seeded } = await supabase
         .from('kanban_columns').insert(DEFAULT_COLS).select()
@@ -137,17 +137,71 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
     setAddingColumn(false)
   }
 
-  // ── Drag & Drop ───────────────────────────────────────────────────────────────
+  async function deleteColumnFromDB(colId: string) {
+    await supabase.from('kanban_tasks').delete().eq('column_id', colId)
+    await supabase.from('kanban_columns').delete().eq('id', colId)
+    setColumns(cols => cols.filter(c => c.id !== colId))
+  }
 
-  function onDragStart(taskId: string, fromColId: string) { dragRef.current = { taskId, fromColId } }
-  function onDragOver(e: React.DragEvent, colId: string)  { e.preventDefault(); setDragOverCol(colId) }
-  function onDragLeave() { setDragOverCol(null) }
-  function onDrop(toColId: string) {
+  async function reorderColumns(fromColId: string, toColId: string) {
+    const sorted = [...columns].sort((a, b) => a.position - b.position)
+    const fromIdx = sorted.findIndex(c => c.id === fromColId)
+    const toIdx   = sorted.findIndex(c => c.id === toColId)
+    if (fromIdx === -1 || toIdx === -1) return
+    const reordered = [...sorted]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    const updated = reordered.map((c, i) => ({ ...c, position: i }))
+    setColumns(updated)
+    await Promise.all(updated.map(c =>
+      supabase.from('kanban_columns').update({ position: c.position }).eq('id', c.id)
+    ))
+  }
+
+  // ── Drag: tarefas ─────────────────────────────────────────────────────────────
+
+  function onTaskDragStart(taskId: string, fromColId: string) {
+    dragTaskRef.current = { taskId, fromColId }
+    dragColRef.current  = null
+  }
+  function onTaskDragOver(e: React.DragEvent, colId: string) {
+    if (dragColRef.current) return
+    e.preventDefault()
+    setDragOverCol(colId)
+  }
+  function onTaskDragLeave() { setDragOverCol(null) }
+  function onTaskDrop(toColId: string) {
     setDragOverCol(null)
-    if (!dragRef.current) return
-    const { taskId, fromColId } = dragRef.current
-    dragRef.current = null
+    if (!dragTaskRef.current) return
+    const { taskId, fromColId } = dragTaskRef.current
+    dragTaskRef.current = null
     if (fromColId !== toColId) moveTaskInDB(taskId, fromColId, toColId)
+  }
+
+  // ── Drag: colunas ─────────────────────────────────────────────────────────────
+
+  function onColDragStart(e: React.DragEvent, colId: string) {
+    dragColRef.current  = colId
+    dragTaskRef.current = null
+    e.stopPropagation()
+  }
+  function onColDragOver(e: React.DragEvent, colId: string) {
+    if (!dragColRef.current) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (dragColRef.current !== colId) setDragOverColReorder(colId)
+  }
+  function onColDragLeave(e: React.DragEvent) {
+    e.stopPropagation()
+    setDragOverColReorder(null)
+  }
+  function onColDrop(e: React.DragEvent, toColId: string) {
+    e.stopPropagation()
+    setDragOverColReorder(null)
+    if (!dragColRef.current || dragColRef.current === toColId) return
+    const fromColId = dragColRef.current
+    dragColRef.current = null
+    reorderColumns(fromColId, toColId)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -180,23 +234,40 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
   return (
     <div className="flex gap-4 overflow-x-auto pb-4 items-start min-h-0 select-none">
 
-      {columns.map(col => (
+      {[...columns].sort((a, b) => a.position - b.position).map(col => (
         <div key={col.id}
-          onDragOver={e => onDragOver(e, col.id)}
-          onDragLeave={onDragLeave}
-          onDrop={() => onDrop(col.id)}
+          onDragOver={e => onTaskDragOver(e, col.id)}
+          onDragLeave={onTaskDragLeave}
+          onDrop={() => onTaskDrop(col.id)}
           className={`flex-shrink-0 w-72 flex flex-col rounded-2xl border backdrop-blur-sm transition-all duration-150
-            ${dragOverCol === col.id
+            ${dragOverColReorder === col.id
               ? 'bg-indigo-500/10 border-indigo-500/40 shadow-lg shadow-indigo-500/10'
-              : 'bg-slate-900/70 border-white/[0.07]'}`}
+              : dragOverCol === col.id
+                ? 'bg-indigo-500/10 border-indigo-500/40 shadow-lg shadow-indigo-500/10'
+                : 'bg-slate-900/70 border-white/[0.07]'}`}
         >
-          {/* Header */}
-          <div className="flex items-center gap-2.5 px-4 pt-4 pb-3 border-b border-white/[0.05]">
+          {/* Header — arrastável para reordenar */}
+          <div
+            draggable
+            onDragStart={e => onColDragStart(e, col.id)}
+            onDragOver={e => onColDragOver(e, col.id)}
+            onDragLeave={onColDragLeave}
+            onDrop={e => onColDrop(e, col.id)}
+            className="group flex items-center gap-2 px-3 pt-4 pb-3 border-b border-white/[0.05] cursor-grab active:cursor-grabbing"
+          >
+            <GripVertical className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 shrink-0 transition-colors" />
             <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${ACCENT_BY_POS[col.position] ?? 'bg-violet-500'}`} />
             <span className="text-white font-semibold text-sm flex-1 truncate">{col.title}</span>
             <span className="text-xs text-slate-300 tabular-nums bg-white/5 px-2 py-0.5 rounded-full shrink-0">
               {col.tasks.length}
             </span>
+            <button
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); deleteColumnFromDB(col.id) }}
+              className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           {/* Tasks */}
@@ -209,7 +280,7 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
             )}
             {col.tasks.map(task => (
               <TaskCard key={task.id} task={task}
-                onDragStart={() => onDragStart(task.id, col.id)} />
+                onDragStart={() => onTaskDragStart(task.id, col.id)} />
             ))}
           </div>
 

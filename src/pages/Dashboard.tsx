@@ -79,25 +79,34 @@ const SECTION_LABELS: Record<string, string> = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+let _audioCtx: AudioContext | null = null
+
 function playAlert() {
   try {
-    const ctx = new AudioContext()
-    const t   = ctx.currentTime
-    ;[
-      { freq: 880, start: 0,    dur: 0.12 },
-      { freq: 660, start: 0.15, dur: 0.12 },
-      { freq: 880, start: 0.30, dur: 0.18 },
-    ].forEach(({ freq, start, dur }) => {
-      const osc  = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain); gain.connect(ctx.destination)
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(freq, t + start)
-      gain.gain.setValueAtTime(0.25, t + start)
-      gain.gain.exponentialRampToValueAtTime(0.001, t + start + dur)
-      osc.start(t + start); osc.stop(t + start + dur)
-    })
-  } catch { /* navegador sem suporte ou bloqueado */ }
+    if (!_audioCtx) _audioCtx = new AudioContext()
+    const ctx = _audioCtx
+
+    const doPlay = () => {
+      const t = ctx.currentTime
+      ;[
+        { freq: 880, start: 0,    dur: 0.12 },
+        { freq: 660, start: 0.15, dur: 0.12 },
+        { freq: 880, start: 0.30, dur: 0.18 },
+      ].forEach(({ freq, start, dur }) => {
+        const osc  = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, t + start)
+        gain.gain.setValueAtTime(0.25, t + start)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + start + dur)
+        osc.start(t + start); osc.stop(t + start + dur)
+      })
+    }
+
+    if (ctx.state === 'suspended') ctx.resume().then(doPlay)
+    else doPlay()
+  } catch { /* navegador sem suporte */ }
 }
 
 export default function Dashboard() {

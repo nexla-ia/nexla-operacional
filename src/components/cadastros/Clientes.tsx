@@ -151,7 +151,7 @@ function ClientModal({ initial, editing, onSave, onClose }: {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function Clientes() {
+export default function Clientes({ readOnly = false }: { readOnly?: boolean }) {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
@@ -204,9 +204,11 @@ export default function Clientes() {
             {loading ? 'Carregando…' : `${clients.length} cliente${clients.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300">
-          <Plus className="w-4 h-4" />Novo Cliente
-        </button>
+        {!readOnly && (
+          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300">
+            <Plus className="w-4 h-4" />Novo Cliente
+          </button>
+        )}
       </div>
       {error && (
         <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/15 text-red-400 text-sm font-medium">
@@ -244,10 +246,12 @@ export default function Clientes() {
                 {c.telefone && <div className="flex items-center gap-2 text-slate-300 text-xs font-medium"><Phone className="w-3 h-3 shrink-0" /><span>{c.telefone}</span></div>}
                 {(c.cidade || c.estado) && <div className="flex items-center gap-2 text-slate-300 text-xs font-medium"><FileText className="w-3 h-3 shrink-0" /><span>{[c.cidade, c.estado].filter(Boolean).join(' · ')}</span></div>}
               </div>
-              <div className="flex gap-1.5 pt-2 border-t border-white/[0.04] opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => openEdit(c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-indigo-300 hover:bg-indigo-500/10 text-xs font-semibold transition-colors"><Pencil className="w-3 h-3" />Editar</button>
-                <button onClick={() => del(c.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-colors"><Trash2 className="w-3 h-3" />Excluir</button>
-              </div>
+              {!readOnly && (
+                <div className="flex gap-1.5 pt-2 border-t border-white/[0.04] opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => openEdit(c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-indigo-300 hover:bg-indigo-500/10 text-xs font-semibold transition-colors"><Pencil className="w-3 h-3" />Editar</button>
+                  <button onClick={() => del(c.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-colors"><Trash2 className="w-3 h-3" />Excluir</button>
+                </div>
+              )}
             </div>
           ))}
         </div>

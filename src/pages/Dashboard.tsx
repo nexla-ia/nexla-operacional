@@ -118,10 +118,15 @@ export default function Dashboard() {
 
   function selectLeaf(id: string) { setActiveSection(id); setSidebarOpen(false) }
 
-  const RESTRICTED = new Set(['dashboard', 'cadastros', 'financeiro'])
-  const visibleNav = role === 'operator'
-    ? NAV.filter(item => !RESTRICTED.has(item.id))
-    : NAV
+  const OPERATOR_NAV: NavItem[] = [
+    { type: 'leaf', id: 'projetos',   label: 'Projetos',    icon: FolderKanban  },
+    { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays  },
+    { type: 'leaf', id: 'kanban',     label: 'Kanban',      icon: LayoutGrid    },
+    { type: 'leaf', id: 'erros-n8n',  label: 'Erros N8N',  icon: AlertTriangle },
+    { type: 'leaf', id: 'clientes',   label: 'Clientes',    icon: Users         },
+    { type: 'leaf', id: 'cobranca',   label: 'Cobranças',   icon: MessageCircle },
+  ]
+  const visibleNav = role === 'operator' ? OPERATOR_NAV : NAV
 
   const userInitials = user?.email ? user.email.slice(0, 2).toUpperCase() : '??'
 
@@ -250,7 +255,7 @@ export default function Dashboard() {
             {activeSection === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
             {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} />}
             {activeSection === 'cobranca'     && <Cobranca />}
-            {activeSection === 'clientes'     && <Clientes />}
+            {activeSection === 'clientes'     && <Clientes readOnly={role === 'operator'} />}
             {activeSection === 'usuarios'     && <Usuarios />}
             {activeSection === 'financeiro'   && <Financeiro />}
             {activeSection === 'calendario'   && <Calendario />}

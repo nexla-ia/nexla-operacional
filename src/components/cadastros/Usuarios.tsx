@@ -36,26 +36,44 @@ function NovoUsuarioModal({ onCreated, onClose }: { onCreated: () => void; onClo
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    // Validações locais
+    if (nome.trim().length < 2)  { setError('Nome deve ter ao menos 2 caracteres.'); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('E-mail inválido.'); return }
+    if (senha.length < 6)        { setError('Senha deve ter ao menos 6 caracteres.'); return }
+
+    // Garante que a chave admin está disponível
+    if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
+      setError('Configuração incompleta: VITE_SUPABASE_SERVICE_ROLE_KEY não definida.')
+      return
+    }
+
     setSaving(true)
 
-    // Cria o usuário via Admin API (sem exigir confirmação de e-mail)
     const { data, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: email.trim().toLowerCase(),
       password: senha,
       email_confirm: true,
-      user_metadata: { full_name: nome },
+      user_metadata: { full_name: nome.trim() },
     })
 
     if (createErr || !data.user) {
-      setError(createErr?.message || 'Erro ao criar usuário.')
+      const msg = createErr?.message ?? ''
+      if (msg.includes('already registered') || msg.includes('already been registered'))
+        setError('Este e-mail já está cadastrado.')
+      else if (msg.includes('password'))
+        setError('Senha inválida: ' + msg)
+      else if (msg.includes('Database error'))
+        setError('Erro no banco de dados. Verifique se a migration 012 foi executada.')
+      else
+        setError(msg || 'Erro ao criar usuário.')
       setSaving(false)
       return
     }
 
-    // Salva nome e cargo no perfil (upsert garante que funciona mesmo se o trigger já inseriu)
     const { error: profileErr } = await supabaseAdmin
       .from('profiles')
-      .upsert({ id: data.user.id, full_name: nome, role }, { onConflict: 'id' })
+      .upsert({ id: data.user.id, full_name: nome.trim(), role }, { onConflict: 'id' })
 
     if (profileErr) {
       setError('Usuário criado, mas perfil não salvo: ' + profileErr.message)

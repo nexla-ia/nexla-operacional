@@ -99,12 +99,12 @@ export default function DashboardHome() {
         {/* Saldo — card destaque */}
         <div className={`relative overflow-hidden rounded-2xl p-6 border col-span-1
           ${positive
-            ? 'bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent border-emerald-500/15'
-            : 'bg-gradient-to-br from-red-500/10 via-transparent to-transparent border-red-500/15'}`}>
+            ? 'bg-gradient-to-br from-emerald-500/12 via-transparent to-transparent border-emerald-500/35'
+            : 'bg-gradient-to-br from-red-500/12 via-transparent to-transparent border-red-500/35'}`}>
           <div className={`absolute -top-12 -right-12 w-48 h-48 rounded-full blur-3xl opacity-15
             ${positive ? 'bg-emerald-400' : 'bg-red-400'}`} />
           <div className="relative">
-            <p className={`text-[10px] font-bold uppercase tracking-widest mb-3 ${positive ? 'text-emerald-600' : 'text-red-600'}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-widest mb-3 ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
               Saldo Líquido
             </p>
             <p className={`text-4xl font-extrabold tracking-tight font-numeric mb-1 ${positive ? 'text-emerald-300' : 'text-red-300'}`}>
@@ -129,9 +129,9 @@ export default function DashboardHome() {
         {/* 3 cards menores */}
         <div className="col-span-1 lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
-            { label: 'Entradas',     sub: 'recebidas',    value: stats.entradas,  Icon: TrendingUp,   color: 'text-indigo-300', bg: 'bg-indigo-500/8',  ring: 'border-indigo-500/12', glow: 'bg-indigo-400' },
-            { label: 'A receber',    sub: 'pendente',      value: stats.pendentes, Icon: Clock,        color: 'text-amber-300',  bg: 'bg-amber-500/8',   ring: 'border-amber-500/12',  glow: 'bg-amber-400' },
-            { label: 'Despesas',     sub: 'total',         value: stats.despesas,  Icon: TrendingDown, color: 'text-red-300',    bg: 'bg-red-500/8',     ring: 'border-red-500/12',    glow: 'bg-red-400' },
+            { label: 'Entradas',     sub: 'recebidas',    value: stats.entradas,  Icon: TrendingUp,   color: 'text-indigo-300', bg: 'bg-indigo-500/10', ring: 'border-indigo-500/30', glow: 'bg-indigo-400' },
+            { label: 'A receber',    sub: 'pendente',      value: stats.pendentes, Icon: Clock,        color: 'text-amber-300',  bg: 'bg-amber-500/10',  ring: 'border-amber-500/30',  glow: 'bg-amber-400' },
+            { label: 'Despesas',     sub: 'total',         value: stats.despesas,  Icon: TrendingDown, color: 'text-red-300',    bg: 'bg-red-500/10',    ring: 'border-red-500/30',    glow: 'bg-red-400' },
           ].map(c => (
             <div key={c.label} className={`relative overflow-hidden rounded-2xl p-5 border ${c.bg} ${c.ring} group hover:brightness-110 transition-all`}>
               <div className={`absolute -top-8 -right-8 w-28 h-28 rounded-full blur-2xl opacity-0 group-hover:opacity-10 transition-opacity ${c.glow}`} />
@@ -150,9 +150,9 @@ export default function DashboardHome() {
       {/* ── Contadores ── */}
       <div className="grid grid-cols-3 gap-3 animate-stagger-3">
         {[
-          { label: 'Clientes',     value: stats.clientes,     Icon: Users,        color: 'text-slate-300',  border: 'border-slate-500/10',  bg: 'bg-slate-500/5'  },
-          { label: 'Projetos',     value: stats.projetos,     Icon: FolderKanban, color: 'text-violet-300', border: 'border-violet-500/10', bg: 'bg-violet-500/5' },
-          { label: 'Mensalidades', value: stats.mensalidades, Icon: RefreshCw,    color: 'text-cyan-300',   border: 'border-cyan-500/10',   bg: 'bg-cyan-500/5'   },
+          { label: 'Clientes',     value: stats.clientes,     Icon: Users,        color: 'text-slate-200',  border: 'border-slate-500/25',  bg: 'bg-slate-500/8'  },
+          { label: 'Projetos',     value: stats.projetos,     Icon: FolderKanban, color: 'text-violet-300', border: 'border-violet-500/30', bg: 'bg-violet-500/8' },
+          { label: 'Mensalidades', value: stats.mensalidades, Icon: RefreshCw,    color: 'text-cyan-300',   border: 'border-cyan-500/30',   bg: 'bg-cyan-500/8'   },
         ].map(c => (
           <div key={c.label} className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border ${c.bg} ${c.border}`}>
             <c.Icon className={`w-4 h-4 shrink-0 ${c.color} opacity-60`} />

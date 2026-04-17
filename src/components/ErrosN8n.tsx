@@ -34,84 +34,57 @@ function formatFull(iso: string) {
 }
 
 // ── Renderer de mensagem ──────────────────────────────────────────────────────
-// Transforma o texto do n8n em elementos React:
-// *texto* → negrito   `código` → code   https://... → link clicável
+// Divide o texto em tokens: URL, `código`, *negrito*, texto simples
 
-const URL_RE   = /(https?:\/\/[^\s`\n]+)/g
-const BOLD_RE  = /\*([^*]+)\*/g
-const CODE_RE  = /`([^`]+)`/g
+type Token =
+  | { t: 'url';  v: string }
+  | { t: 'code'; v: string }
+  | { t: 'bold'; v: string }
+  | { t: 'text'; v: string }
 
-function renderSegment(text: string, key: string) {
-  // Divide pelo padrão de URLs
-  const parts = text.split(URL_RE)
-  return parts.map((part, i) => {
-    if (URL_RE.test(part)) {
-      URL_RE.lastIndex = 0
-      return (
-        <a key={`${key}-u${i}`} href={part} target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 underline underline-offset-2 decoration-indigo-500/40 hover:decoration-indigo-400 transition-colors break-all">
-          {part}
-          <ExternalLink className="w-3 h-3 shrink-0 inline" />
-        </a>
-      )
-    }
-    URL_RE.lastIndex = 0
-    return <span key={`${key}-t${i}`}>{part}</span>
-  })
-}
+function tokenize(text: string): Token[] {
+  const RE = /(https?:\/\/[^\s`\n]+)|`([^`]+)`|\*([^*]+)\*/g
+  const tokens: Token[] = []
+  let last = 0
+  let m: RegExpExecArray | null
 
-function renderLine(line: string, lineKey: string) {
-  // Divide por `código` e *negrito*
-  const tokens: React.ReactNode[] = []
-  let remaining = line
-  let idx = 0
-
-  while (remaining.length > 0) {
-    const codeMatch = CODE_RE.exec(remaining)
-    const boldMatch = BOLD_RE.exec(remaining)
-    CODE_RE.lastIndex = 0
-    BOLD_RE.lastIndex = 0
-
-    const firstCode = codeMatch?.index ?? Infinity
-    const firstBold = boldMatch?.index ?? Infinity
-
-    if (firstCode === Infinity && firstBold === Infinity) {
-      tokens.push(...renderSegment(remaining, `${lineKey}-${idx++}`))
-      break
-    }
-
-    if (firstCode <= firstBold && codeMatch) {
-      if (firstCode > 0) tokens.push(...renderSegment(remaining.slice(0, firstCode), `${lineKey}-${idx++}`))
-      tokens.push(
-        <code key={`${lineKey}-c${idx++}`}
-          className="font-mono text-[0.82em] px-1.5 py-0.5 rounded-md bg-white/[0.07] text-slate-200 border border-white/[0.08]">
-          {codeMatch[1]}
-        </code>
-      )
-      remaining = remaining.slice(firstCode + codeMatch[0].length)
-    } else if (boldMatch) {
-      if (firstBold > 0) tokens.push(...renderSegment(remaining.slice(0, firstBold), `${lineKey}-${idx++}`))
-      tokens.push(
-        <strong key={`${lineKey}-b${idx++}`} className="font-semibold text-slate-100">
-          {boldMatch[1]}
-        </strong>
-      )
-      remaining = remaining.slice(firstBold + boldMatch[0].length)
-    } else break
+  while ((m = RE.exec(text)) !== null) {
+    if (m.index > last) tokens.push({ t: 'text', v: text.slice(last, m.index) })
+    if (m[1]) tokens.push({ t: 'url',  v: m[1] })
+    else if (m[2]) tokens.push({ t: 'code', v: m[2] })
+    else if (m[3]) tokens.push({ t: 'bold', v: m[3] })
+    last = m.index + m[0].length
   }
 
+  if (last < text.length) tokens.push({ t: 'text', v: text.slice(last) })
   return tokens
 }
 
 function MessageBody({ text }: { text: string }) {
-  const lines = text.split('\n')
   return (
     <div className="space-y-1 text-sm text-slate-300 leading-relaxed">
-      {lines.map((line, i) => (
-        <p key={i} className={line.trim() === '' ? 'h-2' : ''}>
-          {line.trim() !== '' && renderLine(line, `l${i}`)}
-        </p>
-      ))}
+      {text.split('\n').map((line, i) => {
+        if (line.trim() === '') return <div key={i} className="h-1" />
+        return (
+          <p key={i}>
+            {tokenize(line).map((tok, j) => {
+              if (tok.t === 'url') return (
+                <a key={j} href={tok.v} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors break-all">
+                  {tok.v}<ExternalLink className="w-3 h-3 shrink-0" />
+                </a>
+              )
+              if (tok.t === 'code') return (
+                <code key={j} className="font-mono text-[0.82em] px-1.5 py-0.5 rounded-md bg-white/[0.07] text-slate-200 border border-white/[0.08]">
+                  {tok.v}
+                </code>
+              )
+              if (tok.t === 'bold') return <strong key={j} className="font-semibold text-slate-100">{tok.v}</strong>
+              return <span key={j}>{tok.v}</span>
+            })}
+          </p>
+        )
+      })}
     </div>
   )
 }

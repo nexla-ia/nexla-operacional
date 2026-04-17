@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import {
-  TrendingUp, TrendingDown, DollarSign, Clock,
+  TrendingUp, TrendingDown, Clock,
   Users, FolderKanban, RefreshCw, ArrowDownCircle,
-  Receipt, Loader2, ArrowUpRight, ArrowDownRight,
+  Receipt, Loader2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { numToMask, formatDate } from '../lib/utils'

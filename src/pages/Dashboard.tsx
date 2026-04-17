@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   LogOut, Menu, LayoutGrid, FolderKanban, ChevronDown,
-  Users, UserCog, TrendingUp, CalendarDays, Receipt, RefreshCw, ArrowDownCircle, MessageCircle,
+  Users, UserCog, CalendarDays, Receipt, RefreshCw, ArrowDownCircle, MessageCircle,
   LayoutDashboard, AlertTriangle,
   type LucideIcon,
 } from 'lucide-react'
@@ -19,7 +19,6 @@ import Despesas from '../components/cadastros/Despesas'
 import Mensalidades from '../components/cadastros/Mensalidades'
 import EntradasProjetos from '../components/cadastros/EntradasProjetos'
 import Cobranca from '../components/Cobranca'
-import FinanceiroBar from '../components/FinanceiroBar'
 import DashboardHome from '../components/DashboardHome'
 import ErrosN8n from '../components/ErrosN8n'
 import type { User } from '@supabase/supabase-js'

@@ -174,7 +174,7 @@ export default function Despesas() {
   const [items, setItems]     = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
-  const [tab, setTab]         = useState<'fixa' | 'avulsa'>('fixa')
+  const [tab, setTab]         = useState<'todos' | 'fixa' | 'avulsa'>('todos')
   const [modal, setModal]     = useState(false)
   const [editId, setEditId]   = useState<string | null>(null)
   const [initial, setInitial] = useState<Omit<Expense, 'id'>>(EMPTY)
@@ -218,10 +218,10 @@ export default function Despesas() {
     setItems(is => is.filter(i => i.id !== id))
   }
 
-  function openNew()       { setInitial({ ...EMPTY, tipo: tab }); setEditId(null); setModal(true) }
+  function openNew()       { setInitial({ ...EMPTY, tipo: tab === 'todos' ? 'avulsa' : tab }); setEditId(null); setModal(true) }
   function openEdit(i: Expense) { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }
 
-  const filtered = items.filter(i => i.tipo === tab)
+  const filtered = tab === 'todos' ? items : items.filter(i => i.tipo === tab)
   const total    = filtered.reduce((s, i) => s + (parseBRL(i.valor) ?? 0), 0)
 
   function dataLabel(i: Expense) {
@@ -260,11 +260,50 @@ export default function Despesas() {
 
       {/* ── Cards seletores ── */}
       {!loading && (
-        <div className="grid grid-cols-2 gap-3 mb-5 animate-stagger-2">
+        <div className="grid grid-cols-3 gap-3 mb-5 animate-stagger-2">
+
+          {/* Todos */}
+          <button onClick={() => setTab('todos')}
+            className={`relative overflow-hidden text-left rounded-2xl p-4 border transition-all duration-200
+              ${tab === 'todos'
+                ? 'bg-indigo-500/10 border-indigo-500/30 shadow-lg shadow-indigo-500/10'
+                : 'bg-white/[0.02] border-white/[0.06] hover:border-indigo-500/20 hover:bg-indigo-500/5'}`}>
+            {tab === 'todos' && (
+              <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-indigo-500 blur-2xl opacity-15 pointer-events-none" />
+            )}
+            <div className="relative flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors
+                    ${tab === 'todos' ? 'bg-indigo-500/20' : 'bg-white/[0.05]'}`}>
+                    <Receipt className={`w-3.5 h-3.5 transition-colors ${tab === 'todos' ? 'text-indigo-400' : 'text-slate-400'}`} />
+                  </div>
+                  <span className={`text-xs font-bold uppercase tracking-widest transition-colors
+                    ${tab === 'todos' ? 'text-indigo-400' : 'text-slate-400'}`}>
+                    Todos
+                  </span>
+                </div>
+                <p className={`text-lg font-extrabold font-numeric leading-none transition-colors
+                  ${tab === 'todos' ? 'text-white' : 'text-slate-300'}`}>
+                  R$ {numToMask(grandTotal)}
+                </p>
+                <p className="text-slate-500 text-[11px] mt-1 font-medium">
+                  {items.length} {items.length === 1 ? 'despesa' : 'despesas'}
+                </p>
+              </div>
+              <span className={`text-3xl font-black tabular-nums transition-colors
+                ${tab === 'todos' ? 'text-indigo-500/25' : 'text-white/[0.04]'}`}>
+                {items.length}
+              </span>
+            </div>
+            {tab === 'todos' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500/0 via-indigo-500/60 to-indigo-500/0" />
+            )}
+          </button>
 
           {/* Fixas */}
           <button onClick={() => setTab('fixa')}
-            className={`relative overflow-hidden text-left rounded-2xl p-4 border transition-all duration-200 group
+            className={`relative overflow-hidden text-left rounded-2xl p-4 border transition-all duration-200
               ${tab === 'fixa'
                 ? 'bg-violet-500/10 border-violet-500/30 shadow-lg shadow-violet-500/10'
                 : 'bg-white/[0.02] border-white/[0.06] hover:border-violet-500/20 hover:bg-violet-500/5'}`}>
@@ -283,7 +322,7 @@ export default function Despesas() {
                     Fixas
                   </span>
                 </div>
-                <p className={`text-xl font-extrabold font-numeric leading-none transition-colors
+                <p className={`text-lg font-extrabold font-numeric leading-none transition-colors
                   ${tab === 'fixa' ? 'text-white' : 'text-slate-300'}`}>
                   R$ {numToMask(fixasTotal)}
                 </p>
@@ -303,7 +342,7 @@ export default function Despesas() {
 
           {/* Avulsas */}
           <button onClick={() => setTab('avulsa')}
-            className={`relative overflow-hidden text-left rounded-2xl p-4 border transition-all duration-200 group
+            className={`relative overflow-hidden text-left rounded-2xl p-4 border transition-all duration-200
               ${tab === 'avulsa'
                 ? 'bg-red-500/10 border-red-500/30 shadow-lg shadow-red-500/10'
                 : 'bg-white/[0.02] border-white/[0.06] hover:border-red-500/20 hover:bg-red-500/5'}`}>
@@ -322,7 +361,7 @@ export default function Despesas() {
                     Avulsas
                   </span>
                 </div>
-                <p className={`text-xl font-extrabold font-numeric leading-none transition-colors
+                <p className={`text-lg font-extrabold font-numeric leading-none transition-colors
                   ${tab === 'avulsa' ? 'text-white' : 'text-slate-300'}`}>
                   R$ {numToMask(avulsasTotal)}
                 </p>
@@ -372,14 +411,18 @@ export default function Despesas() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48 text-center animate-stagger-3">
           <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center mb-4
-            ${tab === 'fixa' ? 'bg-violet-500/8 border-violet-500/15' : 'bg-red-500/8 border-red-500/15'}`}>
+            ${tab === 'fixa' ? 'bg-violet-500/8 border-violet-500/15'
+            : tab === 'avulsa' ? 'bg-red-500/8 border-red-500/15'
+            : 'bg-indigo-500/8 border-indigo-500/15'}`}>
             {tab === 'fixa'
               ? <CalendarClock className="w-5 h-5 text-violet-400/60" />
-              : <Receipt className="w-5 h-5 text-red-400/60" />}
+              : <Receipt className={`w-5 h-5 ${tab === 'avulsa' ? 'text-red-400/60' : 'text-indigo-400/60'}`} />}
           </div>
-          <p className="text-slate-300 font-semibold text-sm">Nenhuma despesa {tab === 'fixa' ? 'fixa' : 'avulsa'}</p>
+          <p className="text-slate-300 font-semibold text-sm">
+            {tab === 'todos' ? 'Nenhuma despesa cadastrada' : `Nenhuma despesa ${tab === 'fixa' ? 'fixa' : 'avulsa'}`}
+          </p>
           <p className="text-slate-500 text-xs mt-1">
-            {tab === 'fixa' ? 'Repetem todo mês no mesmo dia.' : 'Despesas pontuais.'}
+            {tab === 'fixa' ? 'Repetem todo mês no mesmo dia.' : tab === 'avulsa' ? 'Despesas pontuais.' : 'Clique em "Nova Despesa" para começar.'}
           </p>
         </div>
       ) : (
@@ -391,14 +434,14 @@ export default function Despesas() {
 
               {/* Accent lateral */}
               <div className={`absolute left-0 top-3 bottom-3 w-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity
-                ${tab === 'fixa' ? 'bg-violet-500' : 'bg-red-500'}`} />
+                ${i.tipo === 'fixa' ? 'bg-violet-500' : 'bg-red-500'}`} />
 
               {/* Ícone */}
               <div className={`w-9 h-9 rounded-xl shrink-0 flex items-center justify-center transition-colors
-                ${tab === 'fixa'
+                ${i.tipo === 'fixa'
                   ? 'bg-violet-500/10 group-hover:bg-violet-500/15'
                   : 'bg-red-500/10 group-hover:bg-red-500/15'}`}>
-                {tab === 'fixa'
+                {i.tipo === 'fixa'
                   ? <CalendarClock className="w-4 h-4 text-violet-400" />
                   : <Receipt className="w-4 h-4 text-red-400" />}
               </div>
@@ -409,14 +452,14 @@ export default function Despesas() {
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   {i.categoria && (
                     <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-md
-                      ${tab === 'fixa'
+                      ${i.tipo === 'fixa'
                         ? 'bg-violet-500/10 text-violet-400'
                         : 'bg-red-500/10 text-red-400'}`}>
                       {i.categoria}
                     </span>
                   )}
                   <span className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
-                    {tab === 'fixa'
+                    {i.tipo === 'fixa'
                       ? <CalendarClock className="w-3 h-3 shrink-0" />
                       : <Calendar className="w-3 h-3 shrink-0" />}
                     {dataLabel(i)}
@@ -426,7 +469,7 @@ export default function Despesas() {
 
               {/* Valor */}
               <p className={`font-extrabold text-sm shrink-0 font-numeric tabular-nums
-                ${tab === 'fixa' ? 'text-violet-300' : 'text-red-300'}`}>
+                ${i.tipo === 'fixa' ? 'text-violet-300' : 'text-red-300'}`}>
                 R$ {i.valor}
               </p>
 

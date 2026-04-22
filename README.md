@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nexla Operacional
 
-## Getting Started
+Plataforma interna de gestão operacional da Nexla. Centraliza projetos, clientes, financeiro, kanban e gestão de tokens de IA.
 
-First, run the development server:
+## Stack
+
+- **React 18** + **TypeScript** — interface
+- **Vite 5** — bundler
+- **Tailwind CSS 3** — estilização
+- **Supabase** — banco de dados (PostgreSQL), autenticação e realtime
+- **React Router v7** — roteamento
+- **Lucide React** — ícones
+
+## Funcionalidades
+
+| Módulo | Descrição |
+|---|---|
+| **Dashboard** | Visão geral financeira — saldo, entradas, despesas, projetos |
+| **Projetos** | Cadastro e gestão de projetos por cliente |
+| **Kanban** | Board de tarefas com drag-and-drop manual |
+| **Clientes** | Cadastro de PF/PJ com dados completos |
+| **Usuários** | Gestão de usuários com perfis admin/operador |
+| **Despesas** | Controle de despesas fixas e avulsas |
+| **Mensalidades** | Recorrências mensais por cliente |
+| **Entradas de Projetos** | Registro de recebimentos por projeto |
+| **Cobranças** | Acompanhamento de cobranças pendentes |
+| **Calendário** | Eventos e agenda da equipe |
+| **Erros N8N** | Monitor de erros de automações N8N com badge e alerta sonoro |
+| **Conversor de Moeda** | Conversão USD ↔ BRL via AwesomeAPI para custo de tokens de IA |
+
+## Roles
+
+- `admin` — acesso completo a todos os módulos
+- `operator` — acesso restrito a projetos, kanban, clientes e cobranças
+
+## Setup
+
+### Pré-requisitos
+
+- Node.js 18+
+- Conta no [Supabase](https://supabase.com)
+
+### Instalação
+
+```bash
+npm install
+```
+
+### Variáveis de ambiente
+
+Crie um arquivo `.env` na raiz:
+
+```env
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-anon-key
+VITE_SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key
+```
+
+### Banco de dados
+
+Execute as migrations na ordem em **Supabase → SQL Editor**:
+
+```
+migrations/001_initial_schema.sql
+migrations/002_projects.sql
+...
+migrations/024_app_settings_bid.sql
+```
+
+### Desenvolvimento
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse [http://localhost:5173](http://localhost:5173).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+```
 
-## Learn More
+## Estrutura
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+├── components/
+│   ├── cadastros/       # Clientes, Usuários, Despesas, Mensalidades, etc.
+│   ├── DashboardHome    # Visão geral financeira
+│   ├── KanbanBoard      # Board de tarefas
+│   ├── Projects         # Gestão de projetos
+│   ├── Cobranca         # Cobranças
+│   ├── ErrosN8n         # Monitor de erros N8N
+│   └── Configuracoes    # Conversor de moeda / configurações do sistema
+├── pages/
+│   ├── Dashboard.tsx    # Shell principal com sidebar
+│   └── LoginPage.tsx    # Autenticação
+└── lib/
+    ├── supabase.ts      # Cliente Supabase
+    ├── auth.ts          # Funções de autenticação
+    ├── types.ts         # Interfaces TypeScript
+    └── utils.ts         # Formatação de datas e valores BRL
+```

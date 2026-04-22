@@ -21,6 +21,7 @@ import EntradasProjetos from '../components/cadastros/EntradasProjetos'
 import Cobranca from '../components/Cobranca'
 import DashboardHome from '../components/DashboardHome'
 import ErrosN8n from '../components/ErrosN8n'
+import Configuracoes from '../components/Configuracoes'
 import type { User } from '@supabase/supabase-js'
 import type { Project, Client } from '../lib/types'
 
@@ -349,6 +350,7 @@ export default function Dashboard() {
             {activeSection === 'mensalidades' && <Mensalidades />}
             {activeSection === 'entradas'     && <EntradasProjetos />}
             {activeSection === 'erros-n8n'    && <ErrosN8n />}
+            {activeSection === 'configuracoes' && <Configuracoes />}
           </div>
         </main>
       </div>

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, X, FolderKanban, Calendar, DollarSign, User, Phone, Loader2, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, FolderKanban, Calendar, DollarSign, User, Phone, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { maskBRL, parseBRL, numToMask, formatDate } from '../lib/utils'
 import type { Project, Client } from '../lib/types'
+import { SearchableSelect } from './SearchableSelect'
 
 export type { Project }
 
@@ -130,21 +131,17 @@ function ProjectModal({ initial, clients, onSave, onClose, editing }: ModalProps
                 <span className="text-amber-300 text-xs">Cadastre um cliente primeiro.</span>
               </div>
             ) : (
-              <div className="relative">
-                <select
-                  required
-                  value={form.client_id ?? ''}
-                  onChange={e => handleClientSelect(e.target.value)}
-                  className={inputCls + ' appearance-none cursor-pointer pr-10'}
-                  style={{ colorScheme: 'dark' }}
-                >
-                  <option value="" disabled>Selecione um cliente…</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              </div>
+              <SearchableSelect
+                required
+                value={form.client_id ?? ''}
+                onChange={handleClientSelect}
+                placeholder="Selecione um cliente…"
+                options={clients.map(c => ({
+                  value: c.id,
+                  label: c.nome,
+                  sublabel: c.cpf_cnpj || c.telefone || undefined,
+                }))}
+              />
             )}
           </div>
 

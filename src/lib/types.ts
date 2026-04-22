@@ -44,6 +44,7 @@ export interface Expense {
   data: string
   categoria: string
   tipo: 'fixa' | 'avulsa'
+  dia_vencimento?: number
 }
 
 export interface Mensalidade {

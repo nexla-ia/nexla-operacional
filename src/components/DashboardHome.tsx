@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react'
 import {
   TrendingUp, TrendingDown, Clock,
   Users, FolderKanban, RefreshCw, ArrowDownCircle,
-  Receipt, Loader2,
+  Receipt, Loader2, DollarSign,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { numToMask, formatDate } from '../lib/utils'
 
 interface Stats {
   saldo: number; entradas: number; pendentes: number; despesas: number
-  clientes: number; projetos: number; mensalidades: number
+  clientes: number; projetos: number; mensalidades: number; valorProjetos: number
 }
 
 interface Movement {
@@ -20,7 +20,7 @@ const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho'
 const DAYS_PT   = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 
 export default function DashboardHome() {
-  const [stats,    setStats]    = useState<Stats>({ saldo:0, entradas:0, pendentes:0, despesas:0, clientes:0, projetos:0, mensalidades:0 })
+  const [stats,    setStats]    = useState<Stats>({ saldo:0, entradas:0, pendentes:0, despesas:0, clientes:0, projetos:0, mensalidades:0, valorProjetos:0 })
   const [recent,   setRecent]   = useState<Movement[]>([])
   const [loading,  setLoading]  = useState(true)
 
@@ -35,24 +35,28 @@ export default function DashboardHome() {
     const [
       { data: entries },
       { data: expenses },
+      { data: projectsValor },
       { count: cClientes },
       { count: cProjetos },
       { count: cMens },
     ] = await Promise.all([
       supabase.from('project_entries').select('valor,status,data,nome_projeto,id').order('data', { ascending: false }).limit(20),
       supabase.from('expenses').select('valor,data,descricao,id').order('data', { ascending: false }).limit(20),
+      supabase.from('projects').select('valor'),
       supabase.from('clients').select('*',      { count: 'exact', head: true }),
       supabase.from('projects').select('*',     { count: 'exact', head: true }),
       supabase.from('mensalidades').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
     ])
 
-    const entradas  = (entries  ?? []).filter(e => e.status === 'recebido').reduce((s, e) => s + (e.valor ?? 0), 0)
-    const pendentes = (entries  ?? []).filter(e => e.status === 'pendente').reduce((s, e) => s + (e.valor ?? 0), 0)
-    const despesas  = (expenses ?? []).reduce((s, e) => s + (e.valor ?? 0), 0)
+    const entradas     = (entries      ?? []).filter(e => e.status === 'recebido').reduce((s, e) => s + (e.valor ?? 0), 0)
+    const pendentes    = (entries      ?? []).filter(e => e.status === 'pendente').reduce((s, e) => s + (e.valor ?? 0), 0)
+    const despesas     = (expenses     ?? []).reduce((s, e) => s + (e.valor ?? 0), 0)
+    const valorProjetos = (projectsValor ?? []).reduce((s, p) => s + ((p.valor as number) ?? 0), 0)
 
     setStats({
       entradas, pendentes, despesas,
       saldo: entradas - despesas,
+      valorProjetos,
       clientes:     cClientes ?? 0,
       projetos:     cProjetos ?? 0,
       mensalidades: cMens     ?? 0,
@@ -148,20 +152,38 @@ export default function DashboardHome() {
       </div>
 
       {/* ── Contadores ── */}
-      <div className="grid grid-cols-3 gap-3 animate-stagger-3">
-        {[
-          { label: 'Clientes',     value: stats.clientes,     Icon: Users,        color: 'text-slate-200',  border: 'border-slate-500/25',  bg: 'bg-slate-500/8'  },
-          { label: 'Projetos',     value: stats.projetos,     Icon: FolderKanban, color: 'text-violet-300', border: 'border-violet-500/30', bg: 'bg-violet-500/8' },
-          { label: 'Mensalidades', value: stats.mensalidades, Icon: RefreshCw,    color: 'text-cyan-300',   border: 'border-cyan-500/30',   bg: 'bg-cyan-500/8'   },
-        ].map(c => (
-          <div key={c.label} className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border ${c.bg} ${c.border}`}>
-            <c.Icon className={`w-4 h-4 shrink-0 ${c.color} opacity-60`} />
-            <div>
-              <p className={`text-xl font-extrabold font-numeric ${c.color}`}>{c.value}</p>
-              <p className="text-slate-300 text-xs font-medium">{c.label}</p>
-            </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-stagger-3">
+        <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border bg-slate-500/8 border-slate-500/25">
+          <Users className="w-4 h-4 shrink-0 text-slate-200 opacity-60" />
+          <div>
+            <p className="text-xl font-extrabold font-numeric text-slate-200">{stats.clientes}</p>
+            <p className="text-slate-300 text-xs font-medium">Clientes</p>
           </div>
-        ))}
+        </div>
+
+        <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border bg-violet-500/8 border-violet-500/30">
+          <FolderKanban className="w-4 h-4 shrink-0 text-violet-300 opacity-60" />
+          <div>
+            <p className="text-xl font-extrabold font-numeric text-violet-300">{stats.projetos}</p>
+            <p className="text-slate-300 text-xs font-medium">Projetos</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border bg-emerald-500/8 border-emerald-500/30 sm:col-span-1 col-span-2">
+          <DollarSign className="w-4 h-4 shrink-0 text-emerald-300 opacity-70" />
+          <div className="min-w-0">
+            <p className="text-xl font-extrabold font-numeric text-emerald-300 truncate">R$ {numToMask(stats.valorProjetos)}</p>
+            <p className="text-slate-300 text-xs font-medium">Valor em projetos</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border bg-cyan-500/8 border-cyan-500/30">
+          <RefreshCw className="w-4 h-4 shrink-0 text-cyan-300 opacity-60" />
+          <div>
+            <p className="text-xl font-extrabold font-numeric text-cyan-300">{stats.mensalidades}</p>
+            <p className="text-slate-300 text-xs font-medium">Mensalidades</p>
+          </div>
+        </div>
       </div>
 
       {/* ── Movimentações recentes ── */}

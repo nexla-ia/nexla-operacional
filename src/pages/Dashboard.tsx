@@ -22,7 +22,7 @@ import Cobranca from '../components/Cobranca'
 import DashboardHome from '../components/DashboardHome'
 import ErrosN8n from '../components/ErrosN8n'
 import type { User } from '@supabase/supabase-js'
-import type { Project } from '../lib/types'
+import type { Project, Client } from '../lib/types'
 
 // ── Nav types ─────────────────────────────────────────────────────────────────
 
@@ -121,7 +121,8 @@ export default function Dashboard() {
   const [activeSection, setActiveSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen]     = useState(false)
   const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['grp-projetos', 'cadastros', 'financeiro']))
-  const [pendingKanbanTask, setPendingKanbanTask] = useState<{ title: string; subtitle?: string } | null>(null)
+  const [pendingKanbanTask, setPendingKanbanTask] = useState<{ title: string; subtitle?: string; project_id?: string } | null>(null)
+  const [pendingProjectClient, setPendingProjectClient] = useState<Client | null>(null)
   const [unreadErrors, setUnreadErrors]   = useState(0)
 
   useEffect(() => {
@@ -169,10 +170,17 @@ export default function Dashboard() {
 
   async function handleLogout() { await signOut(); navigate('/') }
 
+  function handleClientCreated(client: Client) {
+    setPendingProjectClient(client)
+    setActiveSection('projetos')
+  }
+
   function handleProjectCreated(project: Project) {
+    if (!project.client_id) return
     setPendingKanbanTask({
-      title: project.nome_projeto,
-      subtitle: project.nome_cliente || undefined,
+      title:      project.nome_projeto,
+      subtitle:   project.nome_cliente || undefined,
+      project_id: project.id,
     })
   }
 
@@ -331,9 +339,9 @@ export default function Dashboard() {
           <div className="relative z-10 animate-fade-in-up h-full">
             {activeSection === 'dashboard'    && <DashboardHome />}
             {activeSection === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
-            {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} />}
+            {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} pendingClient={pendingProjectClient} onPendingClientConsumed={() => setPendingProjectClient(null)} />}
             {activeSection === 'cobranca'     && <Cobranca />}
-            {activeSection === 'clientes'     && <Clientes readOnly={role === 'operator'} />}
+            {activeSection === 'clientes'     && <Clientes readOnly={role === 'operator'} onClientCreated={role !== 'operator' ? handleClientCreated : undefined} />}
             {activeSection === 'usuarios'     && <Usuarios />}
             {activeSection === 'financeiro'   && <Financeiro />}
             {activeSection === 'calendario'   && <Calendario />}

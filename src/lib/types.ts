@@ -3,6 +3,8 @@ export interface Task {
   title: string
   subtitle?: string
   fromProject?: boolean
+  color?: string
+  project_id?: string
 }
 
 export interface Column {
@@ -20,6 +22,7 @@ export interface Project {
   valor: string
   data_termino: string
   descricao: string
+  client_id?: string
 }
 
 export interface Client {

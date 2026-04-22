@@ -1,8 +1,29 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, Users, Loader2, Phone, Mail, FileText, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Users, Loader2, Phone, Mail, FileText, ChevronDown, Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { maskPhone, maskCPF, maskCNPJ } from '../../lib/utils'
 import type { Client } from '../../lib/types'
+
+async function fetchCNPJData(cnpj: string): Promise<{ nome?: string; cidade?: string; estado?: string; telefone?: string; email?: string } | null> {
+  const digits = cnpj.replace(/\D/g, '')
+  if (digits.length !== 14) return null
+  try {
+    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return {
+      nome:     data.razao_social || data.nome_fantasia || undefined,
+      cidade:   data.municipio    || undefined,
+      estado:   data.uf           || undefined,
+      telefone: data.ddd_telefone_1
+        ? data.ddd_telefone_1.replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3')
+        : undefined,
+      email:    data.email        || undefined,
+    }
+  } catch {
+    return null
+  }
+}
 
 const EMPTY: Omit<Client, 'id'> = {
   nome: '', email: '', telefone: '', cpf_cnpj: '',
@@ -69,9 +90,25 @@ function ClientModal({ initial, editing, onSave, onClose }: {
   onSave: (d: Omit<Client, 'id'>) => Promise<void>
   onClose: () => void
 }) {
-  const [form, setForm] = useState(initial)
-  const [saving, setSaving] = useState(false)
+  const [form, setForm]         = useState(initial)
+  const [saving, setSaving]     = useState(false)
+  const [cnpjLookup, setCnpjLookup] = useState<'idle' | 'loading' | 'error'>('idle')
   const set = (k: keyof Omit<Client, 'id'>, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  async function handleCNPJLookup() {
+    setCnpjLookup('loading')
+    const result = await fetchCNPJData(form.cpf_cnpj)
+    if (!result) { setCnpjLookup('error'); return }
+    setForm(f => ({
+      ...f,
+      nome:     result.nome     || f.nome,
+      cidade:   result.cidade   || f.cidade,
+      estado:   result.estado   || f.estado,
+      telefone: result.telefone ? maskPhone(result.telefone) : f.telefone,
+      email:    result.email    || f.email,
+    }))
+    setCnpjLookup('idle')
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -108,10 +145,31 @@ function ClientModal({ initial, editing, onSave, onClose }: {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><label className={labelCls}>Nome *</label>
               <input className={inputCls} placeholder="Nome completo ou razão social" value={form.nome} onChange={e => set('nome', e.target.value)} required /></div>
-            <div><label className={labelCls}>{form.tipo === 'PF' ? 'CPF' : 'CNPJ'}</label>
-              <input className={inputCls} placeholder={form.tipo === 'PF' ? '000.000.000-00' : '00.000.000/0001-00'}
-                value={form.cpf_cnpj} inputMode="numeric"
-                onChange={e => set('cpf_cnpj', form.tipo === 'PF' ? maskCPF(e.target.value) : maskCNPJ(e.target.value))} /></div>
+            <div>
+              <label className={labelCls}>{form.tipo === 'PF' ? 'CPF' : 'CNPJ'}</label>
+              <div className="flex gap-2">
+                <input className={inputCls} placeholder={form.tipo === 'PF' ? '000.000.000-00' : '00.000.000/0001-00'}
+                  value={form.cpf_cnpj} inputMode="numeric"
+                  onChange={e => { set('cpf_cnpj', form.tipo === 'PF' ? maskCPF(e.target.value) : maskCNPJ(e.target.value)); setCnpjLookup('idle') }} />
+                {form.tipo === 'PJ' && (
+                  <button
+                    type="button"
+                    onClick={handleCNPJLookup}
+                    disabled={cnpjLookup === 'loading' || form.cpf_cnpj.replace(/\D/g, '').length !== 14}
+                    title="Buscar dados do CNPJ"
+                    className="shrink-0 px-3 py-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/25 text-indigo-300
+                               hover:bg-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {cnpjLookup === 'loading'
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Search className="w-4 h-4" />}
+                  </button>
+                )}
+              </div>
+              {cnpjLookup === 'error' && (
+                <p className="text-red-400 text-[10px] mt-1">CNPJ não encontrado ou inválido.</p>
+              )}
+            </div>
           </div>
           {/* Email | Telefone */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -151,7 +209,7 @@ function ClientModal({ initial, editing, onSave, onClose }: {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function Clientes({ readOnly = false }: { readOnly?: boolean }) {
+export default function Clientes({ readOnly = false, onClientCreated }: { readOnly?: boolean; onClientCreated?: (client: Client) => void }) {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
@@ -181,7 +239,11 @@ export default function Clientes({ readOnly = false }: { readOnly?: boolean }) {
     } else {
       const { data: row, error } = await supabase.from('clients').insert(payload).select().single()
       if (error || !row) { setError('Erro ao criar.'); return }
-      setClients(cs => [...cs, fromDB(row)])
+      const newClient = fromDB(row)
+      setClients(cs => [...cs, newClient])
+      setModal(false)
+      onClientCreated?.(newClient)
+      return
     }
     setModal(false)
   }

@@ -222,7 +222,6 @@ export default function Despesas() {
   function openEdit(i: Expense) { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }
 
   const filtered = tab === 'todos' ? items : items.filter(i => i.tipo === tab)
-  const total    = filtered.reduce((s, i) => s + (parseBRL(i.valor) ?? 0), 0)
 
   function dataLabel(i: Expense) {
     if (i.tipo === 'fixa') {
@@ -493,7 +492,7 @@ export default function Despesas() {
         <ExpenseModal
           initial={initial}
           editing={!!editId}
-          tipo={tab}
+          tipo={tab === 'todos' ? 'avulsa' : tab}
           onSave={handleSave}
           onClose={() => setModal(false)}
         />

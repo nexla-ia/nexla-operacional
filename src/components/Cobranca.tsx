@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { MessageCircle, Search, RefreshCw, Loader2, Phone, X, Check, ChevronDown } from 'lucide-react'
+import { createPortal } from 'react-dom'
 
 import { supabase } from '../lib/supabase'
 import { numToMask } from '../lib/utils'
@@ -28,34 +29,58 @@ const MES_ATUAL = (() => {
 })()
 
 // ── Status Dropdown ───────────────────────────────────────────────────────────
+// Usa portal + posição fixed para não ser clipado por overflow:hidden
 
 function StatusDropdown({ status, onChange }: {
   status: PagamentoStatus
   onChange: (s: PagamentoStatus) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const isPago = status === 'pago'
+  const [open, setOpen]   = useState(false)
+  const [rect, setRect]   = useState<DOMRect | null>(null)
+  const btnRef            = useRef<HTMLButtonElement>(null)
+  const isPago            = status === 'pago'
+
+  function handleOpen(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!open && btnRef.current) setRect(btnRef.current.getBoundingClientRect())
+    setOpen(o => !o)
+  }
+
+  // calcula posição: abre para cima se não há espaço abaixo
+  const menuStyle = rect ? (() => {
+    const menuH    = 80
+    const spaceBelow = window.innerHeight - rect.bottom
+    const openUp   = spaceBelow < menuH + 8
+    return {
+      position: 'fixed' as const,
+      right:    window.innerWidth - rect.right,
+      top:      openUp ? rect.top - menuH - 4 : rect.bottom + 4,
+      minWidth: 130,
+      zIndex:   9999,
+    }
+  })() : {}
 
   return (
-    <div className="relative">
+    <>
       <button
-        onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all
+        ref={btnRef}
+        onClick={handleOpen}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all whitespace-nowrap
           ${isPago
             ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
             : 'bg-slate-700/40 border-white/[0.08] text-slate-400 hover:border-white/20 hover:text-white'}`}
       >
         {isPago
           ? <Check className="w-3 h-3" />
-          : <span className="w-3 h-3 rounded-full border border-current opacity-50 inline-block" />}
+          : <span className="w-3 h-3 rounded-full border border-current opacity-50 inline-block shrink-0" />}
         {isPago ? 'Pago' : 'Não pago'}
-        <ChevronDown className="w-3 h-3 opacity-50" />
+        <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
       </button>
 
-      {open && (
+      {open && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1.5 z-20 min-w-[130px] rounded-xl border border-white/10 bg-slate-900 shadow-xl overflow-hidden">
+          <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => setOpen(false)} />
+          <div style={menuStyle} className="rounded-xl border border-white/10 bg-slate-900 shadow-2xl overflow-hidden">
             <button
               onClick={e => { e.stopPropagation(); onChange('pago'); setOpen(false) }}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 transition-colors"
@@ -71,9 +96,10 @@ function StatusDropdown({ status, onChange }: {
               Não pago
             </button>
           </div>
-        </>
+        </>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
 
@@ -84,9 +110,15 @@ export default function Cobranca() {
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
   const [statuses, setStatuses] = useState<Record<string, PagamentoStatus>>({})
+  const [userId, setUserId]     = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+
+    // Garante que temos o user_id para salvar no banco
+    const { data: { user } } = await supabase.auth.getUser()
+    const uid = user?.id ?? null
+    setUserId(uid)
 
     const [
       { data: clients },
@@ -102,7 +134,6 @@ export default function Cobranca() {
       supabase.from('cobranca_pagamentos').select('client_id, status').eq('mes', MES_ATUAL),
     ])
 
-    // Mapa de status do mês atual
     const statusMap: Record<string, PagamentoStatus> = {}
     for (const p of pagamentos ?? []) {
       statusMap[p.client_id] = p.status as PagamentoStatus
@@ -149,11 +180,22 @@ export default function Cobranca() {
   useEffect(() => { load() }, [load])
 
   async function changeStatus(clientId: string, status: PagamentoStatus) {
+    if (!userId) return
+    // Atualiza UI imediatamente
     setStatuses(prev => ({ ...prev, [clientId]: status }))
-    await supabase.from('cobranca_pagamentos').upsert(
-      { client_id: clientId, mes: MES_ATUAL, status },
+    // Salva no banco com user_id (necessário para RLS + constraint única)
+    const { error } = await supabase.from('cobranca_pagamentos').upsert(
+      { user_id: userId, client_id: clientId, mes: MES_ATUAL, status },
       { onConflict: 'user_id,client_id,mes' }
     )
+    if (error) {
+      // Reverte se falhou
+      setStatuses(prev => {
+        const next = { ...prev }
+        delete next[clientId]
+        return next
+      })
+    }
   }
 
   const filtered = rows.filter(r =>
@@ -167,7 +209,6 @@ export default function Cobranca() {
 
   return (
     <>
-      {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div>
           <h1 className="text-white font-bold text-xl">Cobranças</h1>
@@ -185,7 +226,6 @@ export default function Cobranca() {
         </button>
       </div>
 
-      {/* Resumo do mês */}
       {!loading && (
         <div className="flex gap-3 mb-5">
           <div className="flex-1 px-4 py-3 rounded-xl bg-emerald-500/8 border border-emerald-500/15">
@@ -199,7 +239,6 @@ export default function Cobranca() {
         </div>
       )}
 
-      {/* Busca */}
       <div className="relative mb-5">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input
@@ -217,7 +256,6 @@ export default function Cobranca() {
         )}
       </div>
 
-      {/* Lista */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
@@ -230,7 +268,7 @@ export default function Cobranca() {
           </p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/[0.07] bg-slate-900/70 overflow-hidden">
+        <div className="rounded-2xl border border-white/[0.07] bg-slate-900/70">
           {filtered.map((row, idx) => {
             const { client } = row
             const status: PagamentoStatus = statuses[client.id] ?? 'nao_pago'

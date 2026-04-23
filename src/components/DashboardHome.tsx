@@ -32,25 +32,33 @@ export default function DashboardHome() {
   async function load() {
     setLoading(true)
 
+    const hoje        = new Date()
+    const anoMes      = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
+    const inicioMes   = `${anoMes}-01`
+    const fimMes      = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().slice(0, 10)
+
     const [
       { data: entries },
-      { data: expenses },
+      { data: expensesAvulsas },
+      { data: expensesFixas },
       { data: projectsValor },
       { count: cClientes },
       { count: cProjetos },
       { count: cMens },
     ] = await Promise.all([
       supabase.from('project_entries').select('valor,status,data,nome_projeto,id').order('data', { ascending: false }).limit(20),
-      supabase.from('expenses').select('valor,data,descricao,id').order('data', { ascending: false }).limit(20),
+      supabase.from('expenses').select('valor,data,descricao,id,tipo').eq('tipo', 'avulsa').gte('data', inicioMes).lte('data', fimMes),
+      supabase.from('expenses').select('valor,data,descricao,id,tipo').eq('tipo', 'fixa'),
       supabase.from('projects').select('valor'),
       supabase.from('clients').select('*',      { count: 'exact', head: true }),
       supabase.from('projects').select('*',     { count: 'exact', head: true }),
       supabase.from('mensalidades').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
     ])
 
-    const entradas     = (entries      ?? []).filter(e => e.status === 'recebido').reduce((s, e) => s + (e.valor ?? 0), 0)
-    const pendentes    = (entries      ?? []).filter(e => e.status === 'pendente').reduce((s, e) => s + (e.valor ?? 0), 0)
-    const despesas     = (expenses     ?? []).reduce((s, e) => s + (e.valor ?? 0), 0)
+    const expenses      = [...(expensesAvulsas ?? []), ...(expensesFixas ?? [])]
+    const entradas      = (entries  ?? []).filter(e => e.status === 'recebido').reduce((s, e) => s + (e.valor ?? 0), 0)
+    const pendentes     = (entries  ?? []).filter(e => e.status === 'pendente').reduce((s, e) => s + (e.valor ?? 0), 0)
+    const despesas      = expenses.reduce((s, e) => s + (e.valor ?? 0), 0)
     const valorProjetos = (projectsValor ?? []).reduce((s, p) => s + ((p.valor as number) ?? 0), 0)
 
     setStats({
@@ -135,7 +143,7 @@ export default function DashboardHome() {
           {[
             { label: 'Entradas',     sub: 'recebidas',    value: stats.entradas,  Icon: TrendingUp,   color: 'text-indigo-300', bg: 'bg-indigo-500/10', ring: 'border-indigo-500/30', glow: 'bg-indigo-400' },
             { label: 'A receber',    sub: 'pendente',      value: stats.pendentes, Icon: Clock,        color: 'text-amber-300',  bg: 'bg-amber-500/10',  ring: 'border-amber-500/30',  glow: 'bg-amber-400' },
-            { label: 'Despesas',     sub: 'total',         value: stats.despesas,  Icon: TrendingDown, color: 'text-red-300',    bg: 'bg-red-500/10',    ring: 'border-red-500/30',    glow: 'bg-red-400' },
+            { label: 'Despesas',     sub: MONTHS_PT[now.getMonth()].toLowerCase(), value: stats.despesas,  Icon: TrendingDown, color: 'text-red-300',    bg: 'bg-red-500/10',    ring: 'border-red-500/30',    glow: 'bg-red-400' },
           ].map(c => (
             <div key={c.label} className={`relative overflow-hidden rounded-2xl p-5 border ${c.bg} ${c.ring} group hover:brightness-110 transition-all`}>
               <div className={`absolute -top-8 -right-8 w-28 h-28 rounded-full blur-2xl opacity-0 group-hover:opacity-10 transition-opacity ${c.glow}`} />

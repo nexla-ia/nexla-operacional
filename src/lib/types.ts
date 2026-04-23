@@ -45,6 +45,7 @@ export interface Expense {
   categoria: string
   tipo: 'fixa' | 'avulsa'
   dia_vencimento?: number
+  pago: boolean
 }
 
 export interface Mensalidade {

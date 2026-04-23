@@ -6,7 +6,7 @@ import type { Expense } from '../../lib/types'
 import { SearchableSelect } from '../SearchableSelect'
 
 const EMPTY: Omit<Expense, 'id'> = {
-  descricao: '', valor: '', data: '', categoria: '', tipo: 'avulsa', dia_vencimento: undefined,
+  descricao: '', valor: '', data: '', categoria: '', tipo: 'avulsa', dia_vencimento: undefined, pago: false,
 }
 
 const DIAS = Array.from({ length: 31 }, (_, i) => i + 1)
@@ -25,6 +25,7 @@ function fromDB(r: Record<string, unknown>): Expense {
     categoria:      (r.categoria as string) ?? '',
     tipo:           (r.tipo as 'fixa' | 'avulsa') ?? 'avulsa',
     dia_vencimento: (r.dia_vencimento as number) || undefined,
+    pago:           (r.pago as boolean) ?? false,
   }
 }
 
@@ -199,6 +200,7 @@ export default function Despesas() {
       categoria:      data.categoria || null,
       tipo:           data.tipo,
       dia_vencimento: data.tipo === 'fixa' ? (data.dia_vencimento ?? null) : null,
+      pago:           data.pago,
     }
     if (editId) {
       const { error } = await supabase.from('expenses').update(payload).eq('id', editId)
@@ -216,6 +218,11 @@ export default function Despesas() {
     const { error } = await supabase.from('expenses').delete().eq('id', id)
     if (error) { setError('Erro ao excluir.'); return }
     setItems(is => is.filter(i => i.id !== id))
+  }
+
+  async function togglePago(id: string, pago: boolean) {
+    setItems(is => is.map(i => i.id === id ? { ...i, pago } : i))
+    await supabase.from('expenses').update({ pago }).eq('id', id)
   }
 
   function openNew()       { setInitial({ ...EMPTY, tipo: tab === 'todos' ? 'avulsa' : tab }); setEditId(null); setModal(true) }
@@ -468,9 +475,20 @@ export default function Despesas() {
 
               {/* Valor */}
               <p className={`font-extrabold text-sm shrink-0 font-numeric tabular-nums
-                ${i.tipo === 'fixa' ? 'text-violet-300' : 'text-red-300'}`}>
+                ${i.pago ? 'text-slate-500 line-through' : i.tipo === 'fixa' ? 'text-violet-300' : 'text-red-300'}`}>
                 R$ {i.valor}
               </p>
+
+              {/* Toggle pago */}
+              <button
+                onClick={() => togglePago(i.id, !i.pago)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all
+                  ${i.pago
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
+                    : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:border-white/20 hover:text-white'}`}
+              >
+                {i.pago ? '✓ Pago' : 'Não pago'}
+              </button>
 
               {/* Ações */}
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">

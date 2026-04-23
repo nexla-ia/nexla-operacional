@@ -137,7 +137,7 @@ export default function Dashboard() {
         .single()
       const r = (profile?.role as 'admin' | 'operator') ?? 'operator'
       setRole(r)
-      if (r === 'operator') setActiveSection('projetos')
+      if (r === 'operator') setActiveSection('dashboard')
     })
   }, [navigate])
 
@@ -196,6 +196,7 @@ export default function Dashboard() {
   }
 
   const OPERATOR_NAV: NavItem[] = [
+    { type: 'leaf', id: 'dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
     { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays },
     {
       type: 'group', id: 'grp-projetos', label: 'Projetos', icon: FolderKanban,

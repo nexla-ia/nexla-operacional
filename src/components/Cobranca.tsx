@@ -1,23 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Search, RefreshCw, Loader2, Phone, X, Check, ChevronDown } from 'lucide-react'
+import { MessageCircle, Search, RefreshCw, Loader2, X, Check, ChevronDown } from 'lucide-react'
 import { createPortal } from 'react-dom'
 
 import { supabase } from '../lib/supabase'
 import { numToMask } from '../lib/utils'
-import type { Client } from '../lib/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface PendingItem {
+interface MensalidadeItem {
   descricao: string
   valor: number
-  tipo: 'mensalidade' | 'projeto'
-  detalhe?: string
+  dia_vencimento: string
 }
 
 interface ClientRow {
-  client: Client
-  items: PendingItem[]
+  clientId: string
+  clienteNome: string
+  telefone: string
+  items: MensalidadeItem[]
   total: number
 }
 
@@ -29,16 +29,15 @@ const MES_ATUAL = (() => {
 })()
 
 // ── Status Dropdown ───────────────────────────────────────────────────────────
-// Usa portal + posição fixed para não ser clipado por overflow:hidden
 
 function StatusDropdown({ status, onChange }: {
   status: PagamentoStatus
   onChange: (s: PagamentoStatus) => void
 }) {
-  const [open, setOpen]   = useState(false)
-  const [rect, setRect]   = useState<DOMRect | null>(null)
-  const btnRef            = useRef<HTMLButtonElement>(null)
-  const isPago            = status === 'pago'
+  const [open, setOpen] = useState(false)
+  const [rect, setRect] = useState<DOMRect | null>(null)
+  const btnRef          = useRef<HTMLButtonElement>(null)
+  const isPago          = status === 'pago'
 
   function handleOpen(e: React.MouseEvent) {
     e.stopPropagation()
@@ -46,11 +45,10 @@ function StatusDropdown({ status, onChange }: {
     setOpen(o => !o)
   }
 
-  // calcula posição: abre para cima se não há espaço abaixo
   const menuStyle = rect ? (() => {
-    const menuH    = 80
+    const menuH      = 80
     const spaceBelow = window.innerHeight - rect.bottom
-    const openUp   = spaceBelow < menuH + 8
+    const openUp     = spaceBelow < menuH + 8
     return {
       position: 'fixed' as const,
       right:    window.innerWidth - rect.right,
@@ -115,65 +113,49 @@ export default function Cobranca() {
   const load = useCallback(async () => {
     setLoading(true)
 
-    // Garante que temos o user_id para salvar no banco
     const { data: { user } } = await supabase.auth.getUser()
     const uid = user?.id ?? null
     setUserId(uid)
 
     const [
-      { data: clients },
       { data: mensalidades },
-      { data: projects },
-      { data: entries },
       { data: pagamentos },
     ] = await Promise.all([
-      supabase.from('clients').select('*').order('nome'),
-      supabase.from('mensalidades').select('*').eq('status', 'ativo'),
-      supabase.from('projects').select('nome_projeto, nome_cliente'),
-      supabase.from('project_entries').select('*').eq('status', 'pendente'),
+      supabase.from('mensalidades').select('*').eq('status', 'ativo').order('cliente_nome'),
       supabase.from('cobranca_pagamentos').select('client_id, status').eq('mes', MES_ATUAL),
     ])
 
+    // Status do mês: chave = client_id
     const statusMap: Record<string, PagamentoStatus> = {}
     for (const p of pagamentos ?? []) {
       statusMap[p.client_id] = p.status as PagamentoStatus
     }
     setStatuses(statusMap)
 
-    const projectClientMap: Record<string, string> = {}
-    for (const p of projects ?? []) {
-      if (p.nome_projeto && p.nome_cliente)
-        projectClientMap[p.nome_projeto.toLowerCase()] = p.nome_cliente.toLowerCase()
+    // Agrupa mensalidades por client_id (fallback: nome)
+    const groups = new Map<string, ClientRow>()
+    for (const m of mensalidades ?? []) {
+      const key  = m.client_id ?? m.cliente_nome
+      const nome = m.cliente_nome ?? ''
+      if (!groups.has(key)) {
+        groups.set(key, {
+          clientId:    key,
+          clienteNome: nome,
+          telefone:    m.telefone ?? '',
+          items:       [],
+          total:       0,
+        })
+      }
+      const row = groups.get(key)!
+      row.items.push({
+        descricao:      m.descricao ?? 'Mensalidade',
+        valor:          m.valor ?? 0,
+        dia_vencimento: String(m.dia_vencimento ?? ''),
+      })
+      row.total += m.valor ?? 0
     }
 
-    const built: ClientRow[] = []
-    for (const c of clients ?? []) {
-      const nome = c.nome?.toLowerCase() ?? ''
-      const items: PendingItem[] = []
-
-      for (const m of mensalidades ?? []) {
-        const matchById   = m.client_id && m.client_id === c.id
-        const matchByName = !m.client_id && (
-          (m.cliente_nome ?? '').toLowerCase().includes(nome) ||
-          nome.includes((m.cliente_nome ?? '').toLowerCase())
-        )
-        if (matchById || matchByName)
-          items.push({ tipo: 'mensalidade', descricao: m.descricao ?? 'Mensalidade', valor: m.valor ?? 0, detalhe: `vence dia ${m.dia_vencimento}` })
-      }
-
-      for (const e of entries ?? []) {
-        const matchById   = e.client_id && e.client_id === c.id
-        const projCliente = projectClientMap[(e.nome_projeto ?? '').toLowerCase()] ?? ''
-        const matchByName = !e.client_id && projCliente && (projCliente.includes(nome) || nome.includes(projCliente))
-        if (matchById || matchByName)
-          items.push({ tipo: 'projeto', descricao: e.nome_projeto ?? 'Projeto', valor: e.valor ?? 0, detalhe: e.descricao || undefined })
-      }
-
-      const total = items.reduce((s, i) => s + i.valor, 0)
-      built.push({ client: c as Client, items, total })
-    }
-
-    setRows(built)
+    setRows(Array.from(groups.values()))
     setLoading(false)
   }, [])
 
@@ -181,30 +163,22 @@ export default function Cobranca() {
 
   async function changeStatus(clientId: string, status: PagamentoStatus) {
     if (!userId) return
-    // Atualiza UI imediatamente
     setStatuses(prev => ({ ...prev, [clientId]: status }))
-    // Salva no banco com user_id (necessário para RLS + constraint única)
     const { error } = await supabase.from('cobranca_pagamentos').upsert(
       { user_id: userId, client_id: clientId, mes: MES_ATUAL, status },
       { onConflict: 'user_id,client_id,mes' }
     )
     if (error) {
-      // Reverte se falhou
-      setStatuses(prev => {
-        const next = { ...prev }
-        delete next[clientId]
-        return next
-      })
+      setStatuses(prev => { const n = { ...prev }; delete n[clientId]; return n })
     }
   }
 
   const filtered = rows.filter(r =>
-    r.client.nome.toLowerCase().includes(search.toLowerCase()) ||
-    (r.client.telefone ?? '').includes(search)
+    r.clienteNome.toLowerCase().includes(search.toLowerCase())
   )
 
   const pagosCount    = Object.values(statuses).filter(s => s === 'pago').length
-  const naoPagosCount = rows.filter(r => !statuses[r.client.id] || statuses[r.client.id] === 'nao_pago').length
+  const naoPagosCount = rows.filter(r => !statuses[r.clientId] || statuses[r.clientId] === 'nao_pago').length
   const mes = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
 
   return (
@@ -244,7 +218,7 @@ export default function Cobranca() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar cliente ou telefone…"
+          placeholder="Buscar cliente…"
           className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
                      placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                      focus:border-indigo-500/40 transition-all hover:border-white/20"
@@ -264,49 +238,43 @@ export default function Cobranca() {
         <div className="flex flex-col items-center justify-center h-64 text-center">
           <MessageCircle className="w-10 h-10 text-slate-600 mb-4" />
           <p className="text-slate-400 font-medium text-sm">
-            {rows.length === 0 ? 'Nenhum cliente cadastrado' : 'Nenhum resultado'}
+            {rows.length === 0 ? 'Nenhuma mensalidade ativa' : 'Nenhum resultado'}
           </p>
         </div>
       ) : (
         <div className="rounded-2xl border border-white/[0.07] bg-slate-900/70">
           {filtered.map((row, idx) => {
-            const { client } = row
-            const status: PagamentoStatus = statuses[client.id] ?? 'nao_pago'
+            const status: PagamentoStatus = statuses[row.clientId] ?? 'nao_pago'
 
             return (
               <div
-                key={client.id}
+                key={row.clientId}
                 className={`flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.03]
                   ${idx !== 0 ? 'border-t border-white/[0.05]' : ''}
                   ${status === 'pago' ? 'opacity-60' : ''}`}
               >
                 <div className="w-9 h-9 rounded-xl bg-indigo-500/15 ring-1 ring-indigo-500/20 flex items-center justify-center shrink-0">
                   <span className="text-indigo-300 text-xs font-bold">
-                    {client.nome.slice(0, 2).toUpperCase()}
+                    {row.clienteNome.slice(0, 2).toUpperCase()}
                   </span>
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold truncate">{client.nome}</p>
-                  {client.telefone ? (
-                    <span className="flex items-center gap-1 text-slate-400 text-xs mt-0.5">
-                      <Phone className="w-3 h-3" />{client.telefone}
-                    </span>
-                  ) : (
-                    <span className="text-slate-600 text-xs italic mt-0.5 block">sem telefone</span>
-                  )}
+                  <p className="text-white text-sm font-semibold truncate">{row.clienteNome}</p>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    {row.items.length === 1
+                      ? `${row.items[0].descricao} · vence dia ${row.items[0].dia_vencimento}`
+                      : `${row.items.length} mensalidades`}
+                  </p>
                 </div>
 
                 <div className="shrink-0 text-right min-w-[80px]">
-                  {row.total > 0
-                    ? <span className="text-sm font-bold text-red-400">R$ {numToMask(row.total)}</span>
-                    : <span className="text-xs text-slate-500">—</span>
-                  }
+                  <span className="text-sm font-bold text-red-400">R$ {numToMask(row.total)}</span>
                 </div>
 
                 <StatusDropdown
                   status={status}
-                  onChange={s => changeStatus(client.id, s)}
+                  onChange={s => changeStatus(row.clientId, s)}
                 />
               </div>
             )

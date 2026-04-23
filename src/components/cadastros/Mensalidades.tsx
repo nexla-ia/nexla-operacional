@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Pencil, Trash2, X, RefreshCw, Loader2, CheckCircle, PauseCircle, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, RefreshCw, Loader2, CheckCircle, PauseCircle, ChevronDown, Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { maskBRL, parseBRL, numToMask, formatDate } from '../../lib/utils'
 import type { Mensalidade, Client } from '../../lib/types'
@@ -167,6 +167,7 @@ export default function Mensalidades() {
   const [modal, setModal]     = useState(false)
   const [editId, setEditId]   = useState<string | null>(null)
   const [initial, setInitial] = useState<Omit<Mensalidade, 'id'>>(EMPTY)
+  const [search, setSearch]   = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -220,6 +221,7 @@ export default function Mensalidades() {
   }
 
   const totalAtivo = items.filter(i => i.status === 'ativo').reduce((s, i) => s + (parseBRL(i.valor) ?? 0), 0)
+  const filtered   = items.filter(i => i.cliente_nome.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <>
@@ -233,6 +235,24 @@ export default function Mensalidades() {
           <Plus className="w-4 h-4" />Nova Mensalidade
         </button>
       </div>
+      {/* Busca */}
+      <div className="relative mb-5">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar por nome…"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
+                     placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
+                     focus:border-indigo-500/40 transition-all hover:border-white/20"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {error && <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}<button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button></div>}
       {loading ? (
         <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 text-indigo-400 animate-spin" /></div>
@@ -242,7 +262,7 @@ export default function Mensalidades() {
         </div>
       ) : (
         <div className="space-y-2">
-          {items.map(i => (
+          {filtered.map(i => (
             <div key={i.id} className="group flex items-center gap-4 px-5 py-4 rounded-2xl bg-slate-900/70 border border-white/[0.07] hover:border-white/[0.13] transition-all">
               <button onClick={() => toggleStatus(i)} className="shrink-0">
                 {i.status === 'ativo' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <PauseCircle className="w-5 h-5 text-slate-300" />}

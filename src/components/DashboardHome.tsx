@@ -47,8 +47,8 @@ export default function DashboardHome() {
       { count: cMens },
     ] = await Promise.all([
       supabase.from('project_entries').select('valor,status,data,nome_projeto,id').order('data', { ascending: false }).limit(20),
-      supabase.from('expenses').select('valor,data,descricao,id,tipo').eq('tipo', 'avulsa').gte('data', inicioMes).lte('data', fimMes),
-      supabase.from('expenses').select('valor,data,descricao,id,tipo').eq('tipo', 'fixa'),
+      supabase.from('expenses').select('valor,data,descricao,id,tipo,pago').eq('tipo', 'avulsa').gte('data', inicioMes).lte('data', fimMes),
+      supabase.from('expenses').select('valor,data,descricao,id,tipo,pago').eq('tipo', 'fixa'),
       supabase.from('projects').select('valor'),
       supabase.from('clients').select('*',      { count: 'exact', head: true }),
       supabase.from('projects').select('*',     { count: 'exact', head: true }),
@@ -58,7 +58,7 @@ export default function DashboardHome() {
     const expenses      = [...(expensesAvulsas ?? []), ...(expensesFixas ?? [])]
     const entradas      = (entries  ?? []).filter(e => e.status === 'recebido').reduce((s, e) => s + (e.valor ?? 0), 0)
     const pendentes     = (entries  ?? []).filter(e => e.status === 'pendente').reduce((s, e) => s + (e.valor ?? 0), 0)
-    const despesas      = expenses.reduce((s, e) => s + (e.valor ?? 0), 0)
+    const despesas      = expenses.filter(e => e.pago).reduce((s, e) => s + (e.valor ?? 0), 0)
     const valorProjetos = (projectsValor ?? []).reduce((s, p) => s + ((p.valor as number) ?? 0), 0)
 
     setStats({

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Search, RefreshCw, Loader2, X, Check, ChevronDown } from 'lucide-react'
+import { MessageCircle, Search, RefreshCw, Loader2, X, Check, ChevronDown, Briefcase } from 'lucide-react'
 import { createPortal } from 'react-dom'
 
 import { supabase } from '../lib/supabase'
@@ -7,19 +7,25 @@ import { numToMask } from '../lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface MensalidadeItem {
+interface MensalidadeRow {
+  kind: 'mensalidade'
+  clientId: string
+  clienteNome: string
   descricao: string
   valor: number
   dia_vencimento: string
 }
 
-interface ClientRow {
-  clientId: string
-  clienteNome: string
-  telefone: string
-  items: MensalidadeItem[]
-  total: number
+interface EntradaRow {
+  kind: 'entrada'
+  id: string
+  nomeProjeto: string
+  descricao: string
+  valor: number
+  status: 'pendente' | 'recebido'
 }
+
+type Row = MensalidadeRow | EntradaRow
 
 type PagamentoStatus = 'pago' | 'nao_pago'
 
@@ -28,7 +34,7 @@ const MES_ATUAL = (() => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 })()
 
-// ── Status Dropdown ───────────────────────────────────────────────────────────
+// ── Status Dropdown (mensalidades — editável) ─────────────────────────────────
 
 function StatusDropdown({ status, onChange }: {
   status: PagamentoStatus
@@ -101,10 +107,25 @@ function StatusDropdown({ status, onChange }: {
   )
 }
 
+// ── Status Badge (entradas — read-only) ───────────────────────────────────────
+
+function StatusBadge({ status }: { status: 'pendente' | 'recebido' }) {
+  return (
+    <span className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold whitespace-nowrap
+      ${status === 'recebido'
+        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+        : 'bg-orange-500/15 border-orange-500/30 text-orange-400'}`}
+    >
+      {status === 'recebido' ? <Check className="w-3 h-3" /> : <span className="w-3 h-3 rounded-full border border-current opacity-50 inline-block shrink-0" />}
+      {status === 'recebido' ? 'Recebido' : 'Pendente'}
+    </span>
+  )
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function Cobranca() {
-  const [rows, setRows]         = useState<ClientRow[]>([])
+  const [rows, setRows]         = useState<Row[]>([])
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
   const [statuses, setStatuses] = useState<Record<string, PagamentoStatus>>({})
@@ -114,48 +135,44 @@ export default function Cobranca() {
     setLoading(true)
 
     const { data: { user } } = await supabase.auth.getUser()
-    const uid = user?.id ?? null
-    setUserId(uid)
+    setUserId(user?.id ?? null)
 
     const [
       { data: mensalidades },
+      { data: entries },
       { data: pagamentos },
     ] = await Promise.all([
       supabase.from('mensalidades').select('*').eq('status', 'ativo').order('cliente_nome'),
+      supabase.from('project_entries').select('*').order('nome_projeto'),
       supabase.from('cobranca_pagamentos').select('client_id, status').eq('mes', MES_ATUAL),
     ])
 
-    // Status do mês: chave = client_id
     const statusMap: Record<string, PagamentoStatus> = {}
     for (const p of pagamentos ?? []) {
       statusMap[p.client_id] = p.status as PagamentoStatus
     }
     setStatuses(statusMap)
 
-    // Agrupa mensalidades por client_id (fallback: nome)
-    const groups = new Map<string, ClientRow>()
-    for (const m of mensalidades ?? []) {
-      const key  = m.client_id ?? m.cliente_nome
-      const nome = m.cliente_nome ?? ''
-      if (!groups.has(key)) {
-        groups.set(key, {
-          clientId:    key,
-          clienteNome: nome,
-          telefone:    m.telefone ?? '',
-          items:       [],
-          total:       0,
-        })
-      }
-      const row = groups.get(key)!
-      row.items.push({
+    const built: Row[] = [
+      ...(mensalidades ?? []).map(m => ({
+        kind:           'mensalidade' as const,
+        clientId:       m.client_id ?? m.cliente_nome,
+        clienteNome:    m.cliente_nome ?? '',
         descricao:      m.descricao ?? 'Mensalidade',
         valor:          m.valor ?? 0,
         dia_vencimento: String(m.dia_vencimento ?? ''),
-      })
-      row.total += m.valor ?? 0
-    }
+      })),
+      ...(entries ?? []).map(e => ({
+        kind:       'entrada' as const,
+        id:         e.id,
+        nomeProjeto: e.nome_projeto ?? 'Projeto',
+        descricao:  e.descricao ?? '',
+        valor:      e.valor ?? 0,
+        status:     (e.status ?? 'pendente') as 'pendente' | 'recebido',
+      })),
+    ]
 
-    setRows(Array.from(groups.values()))
+    setRows(built)
     setLoading(false)
   }, [])
 
@@ -173,12 +190,18 @@ export default function Cobranca() {
     }
   }
 
+  const q = search.toLowerCase()
   const filtered = rows.filter(r =>
-    r.clienteNome.toLowerCase().includes(search.toLowerCase())
+    r.kind === 'mensalidade'
+      ? r.clienteNome.toLowerCase().includes(q)
+      : r.nomeProjeto.toLowerCase().includes(q)
   )
 
+  const mensRows    = filtered.filter(r => r.kind === 'mensalidade') as MensalidadeRow[]
+  const entradaRows = filtered.filter(r => r.kind === 'entrada')     as EntradaRow[]
+
   const pagosCount    = Object.values(statuses).filter(s => s === 'pago').length
-  const naoPagosCount = rows.filter(r => !statuses[r.clientId] || statuses[r.clientId] === 'nao_pago').length
+  const naoPagosCount = rows.filter(r => r.kind === 'mensalidade' && (!statuses[(r as MensalidadeRow).clientId] || statuses[(r as MensalidadeRow).clientId] === 'nao_pago')).length
   const mes = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
 
   return (
@@ -188,12 +211,9 @@ export default function Cobranca() {
           <h1 className="text-white font-bold text-xl">Cobranças</h1>
           <p className="text-slate-400 text-sm mt-0.5 capitalize">{mes}</p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
+        <button onClick={load} disabled={loading}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-slate-300 text-sm font-medium
-                     bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors
-                     disabled:opacity-50"
+                     bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Atualizar
@@ -218,7 +238,7 @@ export default function Cobranca() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar cliente…"
+          placeholder="Buscar cliente ou projeto…"
           className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
                      placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                      focus:border-indigo-500/40 transition-all hover:border-white/20"
@@ -234,51 +254,74 @@ export default function Cobranca() {
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-center">
           <MessageCircle className="w-10 h-10 text-slate-600 mb-4" />
-          <p className="text-slate-400 font-medium text-sm">
-            {rows.length === 0 ? 'Nenhuma mensalidade ativa' : 'Nenhum resultado'}
-          </p>
+          <p className="text-slate-400 font-medium text-sm">Nenhum registro encontrado</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/[0.07] bg-slate-900/70">
-          {filtered.map((row, idx) => {
-            const status: PagamentoStatus = statuses[row.clientId] ?? 'nao_pago'
+        <div className="space-y-4">
 
-            return (
-              <div
-                key={row.clientId}
-                className={`flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.03]
-                  ${idx !== 0 ? 'border-t border-white/[0.05]' : ''}
-                  ${status === 'pago' ? 'opacity-60' : ''}`}
-              >
-                <div className="w-9 h-9 rounded-xl bg-indigo-500/15 ring-1 ring-indigo-500/20 flex items-center justify-center shrink-0">
-                  <span className="text-indigo-300 text-xs font-bold">
-                    {row.clienteNome.slice(0, 2).toUpperCase()}
-                  </span>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold truncate">{row.clienteNome}</p>
-                  <p className="text-slate-400 text-xs mt-0.5">
-                    {row.items.length === 1
-                      ? `${row.items[0].descricao} · vence dia ${row.items[0].dia_vencimento}`
-                      : `${row.items.length} mensalidades`}
-                  </p>
-                </div>
-
-                <div className="shrink-0 text-right min-w-[80px]">
-                  <span className="text-sm font-bold text-red-400">R$ {numToMask(row.total)}</span>
-                </div>
-
-                <StatusDropdown
-                  status={status}
-                  onChange={s => changeStatus(row.clientId, s)}
-                />
+          {/* ── Mensalidades ── */}
+          {mensRows.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2 px-1">Mensalidades</p>
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-900/70">
+                {mensRows.map((row, idx) => {
+                  const status: PagamentoStatus = statuses[row.clientId] ?? 'nao_pago'
+                  return (
+                    <div key={row.clientId}
+                      className={`flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.03]
+                        ${idx !== 0 ? 'border-t border-white/[0.05]' : ''}
+                        ${status === 'pago' ? 'opacity-60' : ''}`}
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-indigo-500/15 ring-1 ring-indigo-500/20 flex items-center justify-center shrink-0">
+                        <span className="text-indigo-300 text-xs font-bold">{row.clienteNome.slice(0, 2).toUpperCase()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-semibold truncate">{row.clienteNome}</p>
+                        <p className="text-slate-400 text-xs mt-0.5">{row.descricao} · vence dia {row.dia_vencimento}</p>
+                      </div>
+                      <span className="text-sm font-bold text-red-400 shrink-0">R$ {numToMask(row.valor)}</span>
+                      <StatusDropdown status={status} onChange={s => changeStatus(row.clientId, s)} />
+                    </div>
+                  )
+                })}
               </div>
-            )
-          })}
+            </div>
+          )}
+
+          {/* ── Entradas de Projetos ── */}
+          {entradaRows.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2 px-1">Entradas de Projetos</p>
+              <div className="rounded-2xl border border-white/[0.07] bg-slate-900/70">
+                {entradaRows.map((row, idx) => (
+                  <div key={row.id}
+                    className={`flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.03]
+                      ${idx !== 0 ? 'border-t border-white/[0.05]' : ''}
+                      ${row.status === 'recebido' ? 'opacity-60' : ''}`}
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-violet-500/15 ring-1 ring-violet-500/20 flex items-center justify-center shrink-0">
+                      <Briefcase className="w-4 h-4 text-violet-300" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-semibold truncate">{row.nomeProjeto}</p>
+                      {row.descricao && <p className="text-slate-400 text-xs mt-0.5 truncate">{row.descricao}</p>}
+                    </div>
+                    <span className="text-sm font-bold text-red-400 shrink-0">R$ {numToMask(row.valor)}</span>
+                    <StatusBadge status={row.status} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-32 text-center">
+              <p className="text-slate-400 text-sm">Nenhum resultado para "{search}"</p>
+            </div>
+          )}
         </div>
       )}
     </>

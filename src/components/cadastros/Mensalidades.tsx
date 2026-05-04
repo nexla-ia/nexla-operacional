@@ -168,6 +168,7 @@ export default function Mensalidades() {
   const [editId, setEditId]   = useState<string | null>(null)
   const [initial, setInitial] = useState<Omit<Mensalidade, 'id'>>(EMPTY)
   const [search, setSearch]   = useState('')
+  const [statusFilter, setStatusFilter] = useState<'todas' | 'ativo' | 'inativo'>('todas')
 
   useEffect(() => { load() }, [])
 
@@ -220,20 +221,55 @@ export default function Mensalidades() {
     if (!error) setItems(is => is.map(i => i.id === item.id ? { ...i, status: next } : i))
   }
 
-  const totalAtivo = items.filter(i => i.status === 'ativo').reduce((s, i) => s + (parseBRL(i.valor) ?? 0), 0)
-  const filtered   = items.filter(i => i.cliente_nome.toLowerCase().includes(search.toLowerCase()))
+  const totalAtivo   = items.filter(i => i.status === 'ativo').reduce((s, i) => s + (parseBRL(i.valor) ?? 0), 0)
+  const totalInativo = items.filter(i => i.status === 'inativo').reduce((s, i) => s + (parseBRL(i.valor) ?? 0), 0)
+  const qtdAtivas    = items.filter(i => i.status === 'ativo').length
+  const qtdInativas  = items.filter(i => i.status === 'inativo').length
+  const filtered     = items
+    .filter(i => statusFilter === 'todas' ? true : i.status === statusFilter)
+    .filter(i => i.cliente_nome.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-white font-bold text-xl">Mensalidades</h1>
-          <p className="text-slate-300 text-sm mt-0.5">{loading ? 'Carregando…' : `Recorrente mensal: R$ ${numToMask(totalAtivo)}`}</p>
+          <p className="text-slate-300 text-sm mt-0.5">
+            {loading
+              ? 'Carregando…'
+              : <>Recorrente mensal: <span className="text-emerald-400 font-semibold">R$ {numToMask(totalAtivo)}</span>
+                  {qtdInativas > 0 && (
+                    <span className="text-slate-400"> · {qtdInativas} pausada{qtdInativas === 1 ? '' : 's'} (R$ {numToMask(totalInativo)} fora do caixa)</span>
+                  )}
+                </>}
+          </p>
         </div>
         <button onClick={() => { setInitial(EMPTY); setEditId(null); setModal(true) }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 transition-all duration-300">
           <Plus className="w-4 h-4" />Nova Mensalidade
         </button>
+      </div>
+
+      {/* Filtros de status */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {([
+          ['todas',   'Todas',    items.length],
+          ['ativo',   'Ativas',   qtdAtivas],
+          ['inativo', 'Pausadas', qtdInativas],
+        ] as const).map(([key, label, count]) => {
+          const active = statusFilter === key
+          return (
+            <button key={key} onClick={() => setStatusFilter(key)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all
+                ${active
+                  ? key === 'inativo'
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
+                    : 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                  : 'bg-white/[0.03] border-white/10 text-slate-300 hover:border-white/20'}`}>
+              {label} <span className="opacity-70">· {count}</span>
+            </button>
+          )
+        })}
       </div>
       {/* Busca */}
       <div className="relative mb-5">
@@ -262,25 +298,44 @@ export default function Mensalidades() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(i => (
-            <div key={i.id} className="group flex items-center gap-4 px-5 py-4 rounded-2xl bg-slate-900/70 border border-white/[0.07] hover:border-white/[0.13] transition-all">
-              <button onClick={() => toggleStatus(i)} className="shrink-0">
-                {i.status === 'ativo' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <PauseCircle className="w-5 h-5 text-slate-300" />}
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium truncate">{i.cliente_nome}</p>
-                <p className="text-slate-300 text-xs mt-0.5">
-                  {i.descricao} · vence dia {i.dia_vencimento}
-                  {i.data_inicio && ` · desde ${formatDate(i.data_inicio)}`}
+          {filtered.map(i => {
+            const isAtivo = i.status === 'ativo'
+            return (
+              <div key={i.id}
+                className={`group flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all
+                  ${isAtivo
+                    ? 'bg-slate-900/70 border-white/[0.07] hover:border-white/[0.13]'
+                    : 'bg-slate-900/30 border-white/[0.04] hover:border-white/[0.10] opacity-70 hover:opacity-100'}`}>
+                <div className={`shrink-0 w-1 h-10 rounded-full ${isAtivo ? 'bg-emerald-400' : 'bg-amber-400/60'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">{i.cliente_nome}</p>
+                  <p className="text-slate-300 text-xs mt-0.5">
+                    {i.descricao} · vence dia {i.dia_vencimento}
+                    {i.data_inicio && ` · desde ${formatDate(i.data_inicio)}`}
+                    {!isAtivo && <span className="ml-1.5 text-amber-300/90 font-medium">· fora do caixa</span>}
+                  </p>
+                </div>
+                <p className={`font-semibold text-sm shrink-0 ${isAtivo ? 'text-emerald-400' : 'text-slate-400 line-through decoration-slate-500/50'}`}>
+                  R$ {i.valor}
                 </p>
+                <button
+                  onClick={() => toggleStatus(i)}
+                  title={isAtivo ? 'Pausar (não entra no fluxo de caixa)' : 'Reativar'}
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all
+                    ${isAtivo
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25'
+                      : 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25'}`}>
+                  {isAtivo
+                    ? <><CheckCircle className="w-3.5 h-3.5" />Ativa</>
+                    : <><PauseCircle className="w-3.5 h-3.5" />Pausada</>}
+                </button>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={() => { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }} className="p-1.5 rounded-lg text-slate-300 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => del(i.id)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
               </div>
-              <p className={`font-semibold text-sm shrink-0 ${i.status === 'ativo' ? 'text-emerald-400' : 'text-slate-300'}`}>R$ {i.valor}</p>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <button onClick={() => { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }} className="p-1.5 rounded-lg text-slate-300 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                <button onClick={() => del(i.id)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
       {modal && <MensalidadeModal initial={initial} editing={!!editId} clients={clients} onSave={handleSave} onClose={() => setModal(false)} />}

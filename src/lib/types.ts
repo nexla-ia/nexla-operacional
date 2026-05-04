@@ -68,3 +68,17 @@ export interface ProjectEntry {
   data: string
   status: 'pendente' | 'recebido'
 }
+
+export interface Proposal {
+  id: string
+  client_id?: string
+  cliente_nome: string
+  titulo: string
+  descricao: string
+  setup_valor: string
+  mensalidade_valor: string
+  recorrencia: 'mensal' | 'semestral' | 'anual'
+  status: 'rascunho' | 'enviada' | 'aceita' | 'recusada'
+  data_envio: string
+  observacoes: string
+}

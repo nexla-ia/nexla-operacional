@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   LogOut, Menu, LayoutGrid, FolderKanban, ChevronDown,
   Users, UserCog, CalendarDays, Receipt, RefreshCw, ArrowDownCircle, MessageCircle,
-  LayoutDashboard, AlertTriangle, Wallet, FileText,
+  LayoutDashboard, AlertTriangle, Wallet, FileText, Activity,
   type LucideIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -20,6 +20,7 @@ import Mensalidades from '../components/cadastros/Mensalidades'
 import EntradasProjetos from '../components/cadastros/EntradasProjetos'
 import Cobranca from '../components/Cobranca'
 import Propostas from '../components/Propostas'
+import FluxoCaixa from '../components/FluxoCaixa'
 import DashboardHome from '../components/DashboardHome'
 import ErrosN8n from '../components/ErrosN8n'
 import Configuracoes from '../components/Configuracoes'
@@ -69,6 +70,7 @@ const NAV: NavItem[] = [
   {
     type: 'group', id: 'financeiro', label: 'Financeiro', icon: Wallet,
     children: [
+      { type: 'leaf', id: 'fluxo-caixa',  label: 'Fluxo de Caixa',       icon: Activity        },
       { type: 'leaf', id: 'despesas',     label: 'Despesas',             icon: Receipt         },
       { type: 'leaf', id: 'mensalidades', label: 'Mensalidades',         icon: RefreshCw       },
       { type: 'leaf', id: 'entradas',     label: 'Entradas de Projetos', icon: ArrowDownCircle },
@@ -81,6 +83,7 @@ const SECTION_LABELS: Record<string, string> = {
   dashboard: 'Dashboard', projetos: 'Projetos', propostas: 'Propostas', calendario: 'Calendários',
   kanban: 'Kanban', 'erros-n8n': 'Erros N8N',
   clientes: 'Clientes', usuarios: 'Usuários',
+  'fluxo-caixa': 'Fluxo de Caixa',
   despesas: 'Despesas', mensalidades: 'Mensalidades',
   entradas: 'Entradas de Projetos', cobranca: 'Cobranças',
 }
@@ -345,6 +348,7 @@ export default function Dashboard() {
             {activeSection === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
             {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} pendingClient={pendingProjectClient} onPendingClientConsumed={() => setPendingProjectClient(null)} />}
             {activeSection === 'propostas'    && <Propostas />}
+            {activeSection === 'fluxo-caixa'  && <FluxoCaixa />}
             {activeSection === 'cobranca'     && <Cobranca />}
             {activeSection === 'clientes'     && <Clientes readOnly={role === 'operator'} onClientCreated={role !== 'operator' ? handleClientCreated : undefined} />}
             {activeSection === 'usuarios'     && <Usuarios />}

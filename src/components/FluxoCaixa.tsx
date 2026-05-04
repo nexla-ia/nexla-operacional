@@ -33,12 +33,8 @@ function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
-function addMonths(d: Date, n: number) {
-  return new Date(d.getFullYear(), d.getMonth() + n, 1)
-}
-
 function nextDueDate(diaVencimento: number, from: Date): Date {
-  const y = from.getFullYear(), m = from.getMonth(), d = from.getDate()
+  const y = from.getFullYear(), m = from.getMonth()
   const lastDay = new Date(y, m + 1, 0).getDate()
   const dia = Math.min(diaVencimento, lastDay)
   const thisMonth = new Date(y, m, dia)
@@ -575,7 +571,6 @@ function ProjecaoChart12m({ projecao, custoFixo }: {
   const saldosAcum = projecao.map(p => p.saldoAcum)
   const minSaldo   = Math.min(0, ...saldosAcum)
   const maxSaldo   = Math.max(0, ...saldosAcum)
-  const rangeSaldo = Math.max(Math.abs(minSaldo), Math.abs(maxSaldo), 1)
 
   // SVG
   const W = 960, H = 380, padL = 64, padR = 24, padT = 32, padB = 40
@@ -587,9 +582,8 @@ function ProjecaoChart12m({ projecao, custoFixo }: {
 
   const yOf = (v: number) => padT + innerH - (v / maxReceitaDespesa) * innerH
 
-  // Saldo line: range simétrico em torno de 0 quando ambos polos existem
-  const saldoYBase = padT + innerH * (maxSaldo / (maxSaldo - minSaldo || 1))
-  const saldoYOf   = (v: number) => {
+  // Saldo line: usa o range entre min e max para usar todo o eixo Y
+  const saldoYOf = (v: number) => {
     const proportion = (v - minSaldo) / (maxSaldo - minSaldo || 1)
     return padT + innerH - proportion * innerH
   }

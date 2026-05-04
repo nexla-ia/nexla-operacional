@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Plus, Pencil, Trash2, X, FileText, Loader2, Calculator,
   TrendingUp, AlertTriangle, CheckCircle2, Clock, XCircle,
+  Activity, LineChart,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { maskBRL, parseBRL, numToMask, formatDate, maskPhone } from '../lib/utils'
@@ -276,34 +277,247 @@ function ProposalModal({ initial, editing, clients, onSave, onClose }: {
   )
 }
 
+// ── Saúde Financeira do Mês Atual ─────────────────────────────────────────────
+
+function SaudeMes({ receitaRecorrente, entradasMes, custoFixo, despesasMes, qtdMensalidadesAtivas }: {
+  receitaRecorrente: number
+  entradasMes: number
+  custoFixo: number
+  despesasMes: number
+  qtdMensalidadesAtivas: number
+}) {
+  const receitaTotal = receitaRecorrente + entradasMes
+  const despesaTotal = custoFixo + despesasMes
+  const saldo        = receitaTotal - despesaTotal
+  const margemPct    = despesaTotal > 0 ? (saldo / despesaTotal) * 100 : 0
+  const ticketMedio  = qtdMensalidadesAtivas > 0 ? receitaRecorrente / qtdMensalidadesAtivas : 0
+
+  return (
+    <div className="rounded-3xl bg-slate-900/70 border border-white/[0.07] p-6 mb-6">
+      <div className="flex items-center gap-3 mb-5">
+        <div className={`w-9 h-9 rounded-xl ring-1 flex items-center justify-center
+          ${saldo >= 0 ? 'bg-emerald-500/15 ring-emerald-500/25' : 'bg-red-500/15 ring-red-500/25'}`}>
+          <Activity className={`w-4 h-4 ${saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
+        </div>
+        <div>
+          <h3 className="text-white font-semibold text-sm">Saúde do mês atual</h3>
+          <p className="text-slate-300 text-xs mt-0.5">Receita real + entradas recebidas vs despesas</p>
+        </div>
+        <div className={`ml-auto text-right ${saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          <p className="text-[10px] uppercase tracking-wider opacity-80">Saldo</p>
+          <p className="font-bold text-lg leading-none">
+            {saldo >= 0 ? '+' : '−'} R$ {numToMask(Math.abs(saldo))}
+          </p>
+          <p className="text-[10px] opacity-80 mt-0.5">{margemPct >= 0 ? '+' : ''}{margemPct.toFixed(0)}% sobre despesa</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/15 px-4 py-3">
+          <p className="text-emerald-300/90 text-[10px] uppercase tracking-wider">Mensalidades ativas</p>
+          <p className="text-emerald-400 font-semibold text-base mt-1">R$ {numToMask(receitaRecorrente)}</p>
+          <p className="text-slate-300 text-[11px] mt-0.5">{qtdMensalidadesAtivas} cliente{qtdMensalidadesAtivas === 1 ? '' : 's'} · ticket R$ {numToMask(ticketMedio)}</p>
+        </div>
+        <div className="rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/15 px-4 py-3">
+          <p className="text-emerald-300/90 text-[10px] uppercase tracking-wider">Entradas (mês)</p>
+          <p className="text-emerald-400 font-semibold text-base mt-1">R$ {numToMask(entradasMes)}</p>
+          <p className="text-slate-300 text-[11px] mt-0.5">setups e projetos recebidos</p>
+        </div>
+        <div className="rounded-2xl bg-red-500/[0.06] border border-red-500/15 px-4 py-3">
+          <p className="text-red-300/90 text-[10px] uppercase tracking-wider">Despesas fixas</p>
+          <p className="text-red-400 font-semibold text-base mt-1">R$ {numToMask(custoFixo)}</p>
+          <p className="text-slate-300 text-[11px] mt-0.5">recorrentes / mês</p>
+        </div>
+        <div className="rounded-2xl bg-red-500/[0.06] border border-red-500/15 px-4 py-3">
+          <p className="text-red-300/90 text-[10px] uppercase tracking-wider">Despesas avulsas</p>
+          <p className="text-red-400 font-semibold text-base mt-1">R$ {numToMask(despesasMes)}</p>
+          <p className="text-slate-300 text-[11px] mt-0.5">no mês corrente</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Gráfico de Projeção 12 meses ──────────────────────────────────────────────
+
+function ProjecaoChart({ receitaRecorrente, custoFixo, mensalidadeAceitas, mensalidadeEnviadas, setupAceitas, setupEnviadas }: {
+  receitaRecorrente: number
+  custoFixo: number
+  mensalidadeAceitas: number
+  mensalidadeEnviadas: number
+  setupAceitas: number
+  setupEnviadas: number
+}) {
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+  const hoje  = new Date()
+  const labels: string[] = []
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1)
+    labels.push(meses[d.getMonth()] + (d.getMonth() === 0 || i === 0 ? `/${String(d.getFullYear()).slice(2)}` : ''))
+  }
+
+  // Por mês: receita atual + (no mês 0, soma o setup das aceitas/enviadas como receita única)
+  const data = labels.map((_, i) => {
+    const setupExtra = i === 0 ? setupAceitas : 0
+    const setupOpt   = i === 0 ? setupEnviadas : 0
+    return {
+      atual:    receitaRecorrente,
+      aceitas:  mensalidadeAceitas + setupExtra,
+      enviadas: mensalidadeEnviadas + setupOpt,
+      custo:    custoFixo,
+    }
+  })
+
+  const totaisOtimista = data.map(d => d.atual + d.aceitas + d.enviadas)
+  const maxValor = Math.max(custoFixo, ...totaisOtimista, 1) * 1.15
+
+  // Dimensões SVG
+  const W = 720, H = 240, padL = 50, padR = 12, padT = 16, padB = 28
+  const innerW = W - padL - padR
+  const innerH = H - padT - padB
+  const barW   = innerW / 12 * 0.7
+  const step   = innerW / 12
+
+  const yOf = (v: number) => padT + innerH - (v / maxValor) * innerH
+
+  // Saldo cumulativo no cenário "com aceitas"
+  let acum = 0
+  const saldoPath = data.map((d, i) => {
+    acum += (d.atual + d.aceitas) - d.custo
+    return { x: padL + step * i + step / 2, valor: acum }
+  })
+  const saldoMaxAbs = Math.max(...saldoPath.map(p => Math.abs(p.valor)), 1)
+  const saldoYBase  = padT + innerH / 2
+  const saldoYOf    = (v: number) => saldoYBase - (v / saldoMaxAbs) * (innerH / 2 - 8)
+
+  // Y ticks
+  const ticks = [0, maxValor * 0.25, maxValor * 0.5, maxValor * 0.75, maxValor]
+
+  return (
+    <div className="rounded-3xl bg-slate-900/70 border border-white/[0.07] p-6 mb-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-violet-500/15 ring-1 ring-violet-500/25 flex items-center justify-center">
+          <LineChart className="w-4 h-4 text-violet-400" />
+        </div>
+        <div>
+          <h3 className="text-white font-semibold text-sm">Projeção 12 meses</h3>
+          <p className="text-slate-300 text-xs mt-0.5">Receita projetada considerando propostas aceitas e enviadas</p>
+        </div>
+      </div>
+
+      {/* Legenda */}
+      <div className="flex flex-wrap gap-4 mb-3 text-[11px] text-slate-300">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500/80"></span>Receita atual</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400/50"></span>+ Propostas aceitas</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400/50"></span>+ Enviadas (otimista)</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-red-400"></span>Custo fixo</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-indigo-400"></span>Saldo acumulado</span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+          {/* Grid */}
+          {ticks.map((t, i) => (
+            <g key={i}>
+              <line x1={padL} y1={yOf(t)} x2={W - padR} y2={yOf(t)} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+              <text x={padL - 6} y={yOf(t) + 3} fill="rgba(203,213,225,0.6)" fontSize="9" textAnchor="end">
+                {t >= 1000 ? `${(t/1000).toFixed(1)}k` : t.toFixed(0)}
+              </text>
+            </g>
+          ))}
+
+          {/* Barras stacked */}
+          {data.map((d, i) => {
+            const x = padL + step * i + (step - barW) / 2
+            const yAtual    = yOf(d.atual)
+            const hAtual    = padT + innerH - yAtual
+            const yAceitas  = yOf(d.atual + d.aceitas)
+            const hAceitas  = yAtual - yAceitas
+            const yEnviadas = yOf(d.atual + d.aceitas + d.enviadas)
+            const hEnviadas = yAceitas - yEnviadas
+            return (
+              <g key={i}>
+                {hAtual    > 0 && <rect x={x} y={yAtual}    width={barW} height={hAtual}    fill="rgba(16,185,129,0.8)"  rx="2" />}
+                {hAceitas  > 0 && <rect x={x} y={yAceitas}  width={barW} height={hAceitas}  fill="rgba(52,211,153,0.5)"  rx="2" />}
+                {hEnviadas > 0 && <rect x={x} y={yEnviadas} width={barW} height={hEnviadas} fill="rgba(251,191,36,0.5)"  rx="2" />}
+              </g>
+            )
+          })}
+
+          {/* Linha custo fixo */}
+          {custoFixo > 0 && (
+            <line
+              x1={padL} y1={yOf(custoFixo)}
+              x2={W - padR} y2={yOf(custoFixo)}
+              stroke="rgba(248,113,113,0.9)" strokeWidth="1.5" strokeDasharray="4 3"
+            />
+          )}
+
+          {/* Linha saldo acumulado (cenário com aceitas) */}
+          <polyline
+            fill="none"
+            stroke="rgba(129,140,248,0.95)"
+            strokeWidth="1.8"
+            points={saldoPath.map(p => `${p.x},${saldoYOf(p.valor)}`).join(' ')}
+          />
+          {saldoPath.map((p, i) => (
+            <circle key={i} cx={p.x} cy={saldoYOf(p.valor)} r="2.5" fill="rgb(129,140,248)" />
+          ))}
+
+          {/* Eixo X */}
+          {labels.map((l, i) => (
+            <text key={i} x={padL + step * i + step / 2} y={H - 10}
+              fill="rgba(203,213,225,0.7)" fontSize="9" textAnchor="middle">{l}</text>
+          ))}
+        </svg>
+      </div>
+
+      {/* Resumo do cenário */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] px-4 py-3">
+          <p className="text-slate-300 text-[10px] uppercase tracking-wider">Saldo 12m · cenário atual</p>
+          <p className={`font-semibold text-base mt-1 ${(receitaRecorrente - custoFixo) * 12 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            R$ {numToMask((receitaRecorrente - custoFixo) * 12)}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] px-4 py-3">
+          <p className="text-slate-300 text-[10px] uppercase tracking-wider">Com propostas aceitas</p>
+          <p className={`font-semibold text-base mt-1 ${((receitaRecorrente + mensalidadeAceitas - custoFixo) * 12 + setupAceitas) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            R$ {numToMask((receitaRecorrente + mensalidadeAceitas - custoFixo) * 12 + setupAceitas)}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] px-4 py-3">
+          <p className="text-slate-300 text-[10px] uppercase tracking-wider">Otimista (todas aceitas)</p>
+          <p className={`font-semibold text-base mt-1 ${((receitaRecorrente + mensalidadeAceitas + mensalidadeEnviadas - custoFixo) * 12 + setupAceitas + setupEnviadas) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            R$ {numToMask((receitaRecorrente + mensalidadeAceitas + mensalidadeEnviadas - custoFixo) * 12 + setupAceitas + setupEnviadas)}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Calculadora de valor ideal ────────────────────────────────────────────────
 
-function Calculadora({ custoFixoMensal, receitaRecorrente }: {
+function Calculadora({ custoFixoMensal, receitaRecorrente, qtdClientesAtivos }: {
   custoFixoMensal: number
   receitaRecorrente: number
+  qtdClientesAtivos: number
 }) {
-  const [margem, setMargem]     = useState('30')   // % de lucro alvo
-  const [clientes, setClientes] = useState('5')    // capacidade
+  const [margem, setMargem]       = useState('30')
+  const [novosClientes, setNovos] = useState('5')
   const [setupMult, setSetupMult] = useState('1.5')
 
   const margemNum   = parseFloat(margem) || 0
-  const clientesNum = Math.max(1, parseInt(clientes) || 1)
+  const novosNum    = Math.max(1, parseInt(novosClientes) || 1)
   const setupNum    = parseFloat(setupMult) || 0
 
-  // Custo total a cobrir com margem desejada
-  const custoComMargem  = custoFixoMensal * (1 + margemNum / 100)
-  const faltaCobrir     = Math.max(0, custoComMargem - receitaRecorrente)
-
-  // Mensalidade ideal: cobre a parte que falta dividida pela capacidade
-  const mensalidadeIdeal = faltaCobrir / clientesNum
-
-  // Mensalidade mínima (sem margem) — apenas para cobrir custo fixo
-  const minimo = Math.max(0, (custoFixoMensal - receitaRecorrente) / clientesNum)
-
-  // Setup sugerido: múltiplo da mensalidade
-  const setupIdeal = mensalidadeIdeal * setupNum
-
-  const saldo = receitaRecorrente - custoFixoMensal
+  const custoComMargem   = custoFixoMensal * (1 + margemNum / 100)
+  const faltaCobrir      = Math.max(0, custoComMargem - receitaRecorrente)
+  const mensalidadeIdeal = faltaCobrir / novosNum
+  const minimo           = Math.max(0, (custoFixoMensal - receitaRecorrente) / novosNum)
+  const setupIdeal       = mensalidadeIdeal * setupNum
+  const saldo            = receitaRecorrente - custoFixoMensal
 
   return (
     <div className="rounded-3xl bg-slate-900/70 border border-white/[0.07] p-6 mb-6">
@@ -313,7 +527,10 @@ function Calculadora({ custoFixoMensal, receitaRecorrente }: {
         </div>
         <div>
           <h3 className="text-white font-semibold text-sm">Calculadora de valor ideal</h3>
-          <p className="text-slate-300 text-xs mt-0.5">Baseado nas suas despesas fixas e mensalidades ativas</p>
+          <p className="text-slate-300 text-xs mt-0.5">
+            Você já tem <span className="text-emerald-300 font-semibold">{qtdClientesAtivos}</span> cliente{qtdClientesAtivos === 1 ? '' : 's'} pagando.
+            Quanto cobrar pelos próximos?
+          </p>
         </div>
       </div>
 
@@ -343,9 +560,9 @@ function Calculadora({ custoFixoMensal, receitaRecorrente }: {
             value={margem} onChange={e => setMargem(e.target.value)} />
         </div>
         <div>
-          <label className={labelCls}>Quantos clientes?</label>
+          <label className={labelCls}>Novos clientes a fechar</label>
           <input type="number" min={1} className={inputCls}
-            value={clientes} onChange={e => setClientes(e.target.value)} />
+            value={novosClientes} onChange={e => setNovos(e.target.value)} />
         </div>
         <div>
           <label className={labelCls}>Setup = ×Mensalidade</label>
@@ -470,34 +687,73 @@ function ProposalCard({ p, onEdit, onDelete, onStatus }: {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Propostas() {
-  const [items, setItems]       = useState<Proposal[]>([])
-  const [clients, setClients]   = useState<Client[]>([])
-  const [custoFixo, setCusto]   = useState(0)
-  const [receita, setReceita]   = useState(0)
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState('')
-  const [modal, setModal]       = useState(false)
-  const [editId, setEditId]     = useState<string | null>(null)
-  const [initial, setInitial]   = useState<Omit<Proposal, 'id'>>(EMPTY)
-  const [filter, setFilter]     = useState<'todas' | Proposal['status']>('todas')
+  const [items, setItems]             = useState<Proposal[]>([])
+  const [clients, setClients]         = useState<Client[]>([])
+  const [custoFixo, setCusto]         = useState(0)
+  const [receita, setReceita]         = useState(0)
+  const [qtdMensAtivas, setQtdMens]   = useState(0)
+  const [despesasMes, setDespesasMes] = useState(0)
+  const [entradasMes, setEntradasMes] = useState(0)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState('')
+  const [modal, setModal]             = useState(false)
+  const [editId, setEditId]           = useState<string | null>(null)
+  const [initial, setInitial]         = useState<Omit<Proposal, 'id'>>(EMPTY)
+  const [filter, setFilter]           = useState<'todas' | Proposal['status']>('todas')
 
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    const [{ data: props, error: e }, { data: cls }, { data: exp }, { data: mens }] = await Promise.all([
+    const hoje = new Date()
+    const ini  = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0, 10)
+    const fim  = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().slice(0, 10)
+
+    const [
+      { data: props, error: e },
+      { data: cls },
+      { data: expFixas },
+      { data: expAvulsas },
+      { data: mens },
+      { data: entradas },
+    ] = await Promise.all([
       supabase.from('proposals').select('*').order('created_at', { ascending: false }),
       supabase.from('clients').select('id,nome,telefone,email,cpf_cnpj,tipo,cidade,estado,observacoes').order('nome'),
-      supabase.from('expenses').select('valor,tipo').eq('tipo', 'fixa'),
+      supabase.from('expenses').select('valor').eq('tipo', 'fixa'),
+      supabase.from('expenses').select('valor,data,pago').eq('tipo', 'avulsa').gte('data', ini).lte('data', fim),
       supabase.from('mensalidades').select('valor,status').eq('status', 'ativo'),
+      supabase.from('project_entries').select('valor,data,status').eq('status', 'recebido').gte('data', ini).lte('data', fim),
     ])
     if (e) setError('Erro ao carregar propostas.')
     else if (props) setItems(props.map(fromDB))
-    if (cls)  setClients(cls as Client[])
-    if (exp)  setCusto(exp.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
-    if (mens) setReceita(mens.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
+    if (cls)      setClients(cls as Client[])
+    if (expFixas) setCusto(expFixas.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
+    if (expAvulsas) setDespesasMes(expAvulsas.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
+    if (mens) {
+      setReceita(mens.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
+      setQtdMens(mens.length)
+    }
+    if (entradas) setEntradasMes(entradas.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
     setLoading(false)
   }
+
+  // Agregados de propostas para projeção
+  const projecao = useMemo(() => {
+    const sumBy = (status: Proposal['status']) => items
+      .filter(i => i.status === status)
+      .reduce((acc, p) => ({
+        mens: acc.mens + (parseBRL(p.mensalidade_valor) ?? 0),
+        setup: acc.setup + (parseBRL(p.setup_valor) ?? 0),
+      }), { mens: 0, setup: 0 })
+    const aceitas  = sumBy('aceita')
+    const enviadas = sumBy('enviada')
+    return {
+      mensalidadeAceitas:  aceitas.mens,
+      setupAceitas:        aceitas.setup,
+      mensalidadeEnviadas: enviadas.mens,
+      setupEnviadas:       enviadas.setup,
+    }
+  }, [items])
 
   async function handleSave(data: Omit<Proposal, 'id'>) {
     setError('')
@@ -572,7 +828,28 @@ export default function Propostas() {
         </div>
       )}
 
-      <Calculadora custoFixoMensal={custoFixo} receitaRecorrente={receita} />
+      <SaudeMes
+        receitaRecorrente={receita}
+        entradasMes={entradasMes}
+        custoFixo={custoFixo}
+        despesasMes={despesasMes}
+        qtdMensalidadesAtivas={qtdMensAtivas}
+      />
+
+      <ProjecaoChart
+        receitaRecorrente={receita}
+        custoFixo={custoFixo}
+        mensalidadeAceitas={projecao.mensalidadeAceitas}
+        mensalidadeEnviadas={projecao.mensalidadeEnviadas}
+        setupAceitas={projecao.setupAceitas}
+        setupEnviadas={projecao.setupEnviadas}
+      />
+
+      <Calculadora
+        custoFixoMensal={custoFixo}
+        receitaRecorrente={receita}
+        qtdClientesAtivos={qtdMensAtivas}
+      />
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2 mb-5">

@@ -207,7 +207,7 @@ export default function FluxoCaixa() {
   const totalPagar30   = movimentosFuturos.filter(m => m.tipo === 'saida').reduce((s, m) => s + m.valor, 0)
   const saldoProj30    = saldoCaixa + totalReceber30 - totalPagar30
 
-  // Projeção 12 meses
+  // Projeção 12 meses · 3 cenários
   const aceitas  = useMemo(() => proposals.filter(p => p.status === 'aceita'),  [proposals])
   const enviadas = useMemo(() => proposals.filter(p => p.status === 'enviada'), [proposals])
   const sumMens  = (arr: ProposalRow[]) => arr.reduce((s, p) => s + Number(p.mensalidade_valor || 0), 0)
@@ -215,36 +215,48 @@ export default function FluxoCaixa() {
   const mensAceitas  = sumMens(aceitas)
   const mensEnviadas = sumMens(enviadas)
   const setupAceitas = sumSetup(aceitas)
+  const setupEnviadas = sumSetup(enviadas)
 
-  const projecao = useMemo(() => {
-    const meses: { label: string; receita: number; despesa: number; saldoAcum: number; isFuturo: boolean }[] = []
-    let acum = saldoCaixa
+  const projecoes = useMemo(() => {
+    type Mes = { label: string; isFuturo: boolean; receitaBase: number; extraAceitas: number; extraEnviadas: number; despesa: number; saldoBase: number; saldoAceitas: number; saldoOtimista: number }
+    const meses: Mes[] = []
+    let acumBase = saldoCaixa, acumAceitas = saldoCaixa, acumOtimista = saldoCaixa
+
     for (let i = 0; i < 12; i++) {
       const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1)
-      // Receita do mês
-      let receita = receitaRecorrente
-      // Mensalidades das aceitas: começam no próximo mês (i >= 1)
-      if (i >= 1) receita += mensAceitas
-      // Setup das aceitas: cai no mês 1
-      if (i === 1) receita += setupAceitas
-      // Entradas pendentes que caem nesse mês
       const ini = toISO(new Date(d.getFullYear(), d.getMonth(), 1))
       const fim = toISO(new Date(d.getFullYear(), d.getMonth() + 1, 0))
       const pendNoMes = entries.filter(e =>
         e.status === 'pendente' && e.data && e.data >= ini && e.data <= fim
       ).reduce((s, e) => s + Number(e.valor || 0), 0)
-      receita += pendNoMes
-      // Despesa
-      const despesa = custoFixo
-      acum += receita - despesa
+
+      // Receitas extras só se aplicam a partir do próximo mês (i >= 1)
+      const extraAceitasMens   = i >= 1 ? mensAceitas : 0
+      const extraAceitasSetup  = i === 1 ? setupAceitas : 0
+      const extraEnviadasMens  = i >= 1 ? mensEnviadas : 0
+      const extraEnviadasSetup = i === 1 ? setupEnviadas : 0
+
+      const receitaBase     = receitaRecorrente + pendNoMes
+      const extraAceitas    = extraAceitasMens + extraAceitasSetup
+      const extraEnviadas   = extraEnviadasMens + extraEnviadasSetup
+      const despesa         = custoFixo
+
+      acumBase     += receitaBase - despesa
+      acumAceitas  += receitaBase + extraAceitas - despesa
+      acumOtimista += receitaBase + extraAceitas + extraEnviadas - despesa
+
       meses.push({
         label: MES_CURTO[d.getMonth()],
-        receita, despesa, saldoAcum: acum,
         isFuturo: i > 0,
+        receitaBase, extraAceitas, extraEnviadas, despesa,
+        saldoBase: acumBase,
+        saldoAceitas: acumAceitas,
+        saldoOtimista: acumOtimista,
       })
     }
     return meses
-  }, [saldoCaixa, receitaRecorrente, custoFixo, mensAceitas, setupAceitas, entries, hoje])
+  }, [saldoCaixa, receitaRecorrente, custoFixo, mensAceitas, setupAceitas, mensEnviadas, setupEnviadas, entries, hoje])
+
 
   // Histórico 6 meses anteriores (realizado)
   const historico = useMemo(() => {
@@ -486,7 +498,7 @@ export default function FluxoCaixa() {
       )}
 
       {/* Projeção 12m */}
-      <ProjecaoChart12m projecao={projecao} custoFixo={custoFixo} />
+      <ProjecaoChart12m projecoes={projecoes} custoFixo={custoFixo} saldoCaixa={saldoCaixa} />
 
       {/* Histórico 6m */}
       {historico.some(m => m.receita > 0 || m.despesa > 0) && (
@@ -579,26 +591,28 @@ function ColunaMovimentos({ titulo, tone, total, itens }: {
   )
 }
 
-function ProjecaoChart12m({ projecao, custoFixo }: {
-  projecao: { label: string; receita: number; despesa: number; saldoAcum: number; isFuturo: boolean }[]
+function ProjecaoChart12m({ projecoes, custoFixo, saldoCaixa }: {
+  projecoes: { label: string; isFuturo: boolean; receitaBase: number; extraAceitas: number; extraEnviadas: number; despesa: number; saldoBase: number; saldoAceitas: number; saldoOtimista: number }[]
   custoFixo: number
+  saldoCaixa: number
 }) {
-  const maxReceitaDespesa = Math.max(...projecao.flatMap(p => [p.receita, p.despesa]), 1) * 1.2
-  const saldosAcum = projecao.map(p => p.saldoAcum)
-  const minSaldo   = Math.min(0, ...saldosAcum)
-  const maxSaldo   = Math.max(0, ...saldosAcum)
+  const totaisReceita = projecoes.map(p => p.receitaBase + p.extraAceitas + p.extraEnviadas)
+  const maxReceitaDespesa = Math.max(...totaisReceita, ...projecoes.map(p => p.despesa), 1) * 1.2
+
+  // Range para o eixo do saldo (acumulado) — considera os 3 cenários
+  const todosSaldos = projecoes.flatMap(p => [p.saldoBase, p.saldoAceitas, p.saldoOtimista])
+  const minSaldo = Math.min(0, ...todosSaldos, saldoCaixa)
+  const maxSaldo = Math.max(0, ...todosSaldos, saldoCaixa)
 
   // SVG
   const W = 960, H = 380, padL = 64, padR = 24, padT = 32, padB = 40
   const innerW = W - padL - padR
   const innerH = H - padT - padB
   const step   = innerW / 12
-  const barW   = step * 0.32  // duas barras lado a lado
+  const barW   = step * 0.32
   const halfGap = 4
 
   const yOf = (v: number) => padT + innerH - (v / maxReceitaDespesa) * innerH
-
-  // Saldo line: usa o range entre min e max para usar todo o eixo Y
   const saldoYOf = (v: number) => {
     const proportion = (v - minSaldo) / (maxSaldo - minSaldo || 1)
     return padT + innerH - proportion * innerH
@@ -606,7 +620,22 @@ function ProjecaoChart12m({ projecao, custoFixo }: {
 
   const ticks = [0, maxReceitaDespesa * 0.5, maxReceitaDespesa]
 
-  const ultimoSaldo = projecao[projecao.length - 1].saldoAcum
+  // Resumos
+  const finalBase     = projecoes[projecoes.length - 1].saldoBase
+  const finalAceitas  = projecoes[projecoes.length - 1].saldoAceitas
+  const finalOtimista = projecoes[projecoes.length - 1].saldoOtimista
+  const ganhoAceitas  = finalAceitas - finalBase
+  const ganhoOtimista = finalOtimista - finalBase
+  const pctAceitas    = finalBase !== 0 ? (ganhoAceitas / Math.abs(finalBase)) * 100 : 0
+  const pctOtimista   = finalBase !== 0 ? (ganhoOtimista / Math.abs(finalBase)) * 100 : 0
+
+  // Mês mais apertado em cada cenário
+  const minBase     = Math.min(...projecoes.map(p => p.saldoBase))
+  const minAceitas  = Math.min(...projecoes.map(p => p.saldoAceitas))
+  const minOtimista = Math.min(...projecoes.map(p => p.saldoOtimista))
+
+  const linhaSaldo = (key: 'saldoBase' | 'saldoAceitas' | 'saldoOtimista') =>
+    projecoes.map((p, i) => `${padL + step * i + step / 2},${saldoYOf(p[key])}`).join(' ')
 
   return (
     <section className="bg-[#0a0c11] border border-white/[0.06] rounded-3xl p-8 sm:p-10 mb-12">
@@ -620,26 +649,38 @@ function ProjecaoChart12m({ projecao, custoFixo }: {
             Projeção <span className="italic text-slate-300/80" style={{ fontVariationSettings: '"opsz" 96, "SOFT" 80' }}>de caixa</span>
           </h3>
         </div>
-        <div className="flex items-center gap-5 text-[11px] text-slate-300 font-mono uppercase tracking-wider">
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-emerald-400/80" />receita</span>
+        <div className="flex flex-wrap items-center gap-5 text-[11px] text-slate-300 font-mono uppercase tracking-wider">
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-emerald-500/85" />receita base</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-emerald-300/55" />+ aceitas</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-amber-300/55" />+ enviadas</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-rose-400/80" />despesa</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-indigo-300" />saldo acumulado</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-slate-300/70" />saldo base</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-indigo-300" />+ aceitas</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-amber-300" />otimista</span>
         </div>
       </div>
 
       <div className="overflow-x-auto">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
           <defs>
-            <linearGradient id="grRec" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="grBase" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%"  stopColor="rgb(52,211,153)" stopOpacity="0.95" />
               <stop offset="100%" stopColor="rgb(16,185,129)" stopOpacity="0.55" />
+            </linearGradient>
+            <linearGradient id="grAceitas" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"  stopColor="rgb(110,231,183)" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="rgb(52,211,153)" stopOpacity="0.3" />
+            </linearGradient>
+            <linearGradient id="grEnviadas" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"  stopColor="rgb(252,211,77)" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="rgb(245,158,11)" stopOpacity="0.3" />
             </linearGradient>
             <linearGradient id="grDes" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%"  stopColor="rgb(251,113,133)" stopOpacity="0.85" />
               <stop offset="100%" stopColor="rgb(225,29,72)" stopOpacity="0.45" />
             </linearGradient>
-            <linearGradient id="grSal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"  stopColor="rgb(165,180,252)" stopOpacity="0.4" />
+            <linearGradient id="grSalIndigo" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"  stopColor="rgb(165,180,252)" stopOpacity="0.3" />
               <stop offset="100%" stopColor="rgb(99,102,241)" stopOpacity="0" />
             </linearGradient>
           </defs>
@@ -658,23 +699,31 @@ function ProjecaoChart12m({ projecao, custoFixo }: {
           {/* Linha do zero do saldo */}
           {minSaldo < 0 && (
             <line x1={padL} y1={saldoYOf(0)} x2={W - padR} y2={saldoYOf(0)}
-              stroke="rgba(203,213,225,0.25)" strokeDasharray="2 4" />
+              stroke="rgba(203,213,225,0.2)" strokeDasharray="2 4" />
           )}
 
-          {/* Barras receita / despesa lado a lado */}
-          {projecao.map((p, i) => {
+          {/* Barras: receita stacked (base + aceitas + enviadas) à esquerda, despesa à direita */}
+          {projecoes.map((p, i) => {
             const xCenter = padL + step * i + step / 2
             const xR = xCenter - barW - halfGap
             const xD = xCenter + halfGap
-            const yR = yOf(p.receita)
+
+            const yBaseTop      = yOf(p.receitaBase)
+            const hBase         = padT + innerH - yBaseTop
+            const yAceitasTop   = yOf(p.receitaBase + p.extraAceitas)
+            const hAceitas      = yBaseTop - yAceitasTop
+            const yEnviadasTop  = yOf(p.receitaBase + p.extraAceitas + p.extraEnviadas)
+            const hEnviadas     = yAceitasTop - yEnviadasTop
+
             const yD = yOf(p.despesa)
-            const hR = padT + innerH - yR
             const hD = padT + innerH - yD
+
             return (
               <g key={i} opacity={p.isFuturo ? 1 : 0.55}>
-                {hR > 0.5 && <rect x={xR} y={yR} width={barW} height={hR} fill="url(#grRec)" rx="3" />}
+                {hBase     > 0.5 && <rect x={xR} y={yBaseTop}     width={barW} height={hBase}     fill="url(#grBase)"     rx="3" />}
+                {hAceitas  > 0.5 && <rect x={xR} y={yAceitasTop}  width={barW} height={hAceitas}  fill="url(#grAceitas)"  rx="3" />}
+                {hEnviadas > 0.5 && <rect x={xR} y={yEnviadasTop} width={barW} height={hEnviadas} fill="url(#grEnviadas)" rx="3" />}
                 {hD > 0.5 && <rect x={xD} y={yD} width={barW} height={hD} fill="url(#grDes)" rx="3" />}
-                {/* marcador do "agora" */}
                 {i === 0 && (
                   <text x={xCenter} y={padT - 10}
                     fill="rgba(165,180,252,0.85)" fontSize="9" fontFamily="JetBrains Mono"
@@ -692,28 +741,35 @@ function ProjecaoChart12m({ projecao, custoFixo }: {
               stroke="rgba(251,113,133,0.45)" strokeWidth="1" strokeDasharray="3 4" />
           )}
 
-          {/* Saldo acumulado: area + line */}
+          {/* Área debaixo da linha "com aceitas" (cenário primário) */}
           <path
-            fill="url(#grSal)"
+            fill="url(#grSalIndigo)"
             d={`M ${padL + step / 2},${saldoYOf(0)}
-                ${projecao.map((p, i) => `L ${padL + step * i + step / 2},${saldoYOf(p.saldoAcum)}`).join(' ')}
+                ${projecoes.map((p, i) => `L ${padL + step * i + step / 2},${saldoYOf(p.saldoAceitas)}`).join(' ')}
                 L ${padL + step * 11 + step / 2},${saldoYOf(0)} Z`}
           />
-          <polyline
-            fill="none"
-            stroke="rgb(165,180,252)"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            points={projecao.map((p, i) => `${padL + step * i + step / 2},${saldoYOf(p.saldoAcum)}`).join(' ')}
-          />
-          {projecao.map((p, i) => (
-            <circle key={i} cx={padL + step * i + step / 2} cy={saldoYOf(p.saldoAcum)} r="2.5"
+
+          {/* Linha SALDO BASE — slate */}
+          <polyline fill="none" stroke="rgba(203,213,225,0.55)" strokeWidth="1.5"
+            strokeDasharray="3 3" strokeLinecap="round" strokeLinejoin="round"
+            points={linhaSaldo('saldoBase')} />
+
+          {/* Linha SALDO COM ACEITAS — indigo (primária) */}
+          <polyline fill="none" stroke="rgb(165,180,252)" strokeWidth="2.4"
+            strokeLinecap="round" strokeLinejoin="round"
+            points={linhaSaldo('saldoAceitas')} />
+          {projecoes.map((p, i) => (
+            <circle key={i} cx={padL + step * i + step / 2} cy={saldoYOf(p.saldoAceitas)} r="2.5"
               fill="#0a0c11" stroke="rgb(165,180,252)" strokeWidth="1.5" />
           ))}
 
+          {/* Linha SALDO OTIMISTA — amber */}
+          <polyline fill="none" stroke="rgb(252,211,77)" strokeWidth="1.5"
+            strokeLinecap="round" strokeLinejoin="round"
+            points={linhaSaldo('saldoOtimista')} />
+
           {/* Eixo X */}
-          {projecao.map((p, i) => (
+          {projecoes.map((p, i) => (
             <text key={i} x={padL + step * i + step / 2} y={H - 14}
               fill={i === 0 ? 'rgba(255,255,255,0.85)' : 'rgba(203,213,225,0.55)'}
               fontSize="9" fontFamily="JetBrains Mono" textAnchor="middle"
@@ -724,41 +780,90 @@ function ProjecaoChart12m({ projecao, custoFixo }: {
         </svg>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-white/[0.06] border border-white/[0.06] rounded-2xl overflow-hidden mt-8">
-        <ResumoCenario kicker="Saldo em 6 meses"  value={projecao[5].saldoAcum} />
-        <ResumoCenario kicker="Saldo em 12 meses" value={ultimoSaldo} highlight />
-        <ResumoCenario kicker="Mês mais apertado"
-          value={Math.min(...projecao.map(p => p.saldoAcum))}
-          hint={
-            (() => {
-              const idx = projecao.reduce((minI, p, i, arr) => p.saldoAcum < arr[minI].saldoAcum ? i : minI, 0)
-              return projecao[idx].label
-            })()
-          } />
+      {/* Comparativo de cenários em 12 meses */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/[0.06] border border-white/[0.06] rounded-2xl overflow-hidden mt-8">
+        <CenarioCard
+          kicker="Cenário base"
+          subtitle="só receita atual"
+          saldo12m={finalBase}
+          mesApertado={minBase}
+          tone="slate"
+        />
+        <CenarioCard
+          kicker="Com aceitas"
+          subtitle="propostas já fechadas"
+          saldo12m={finalAceitas}
+          delta={ganhoAceitas}
+          deltaPct={pctAceitas}
+          mesApertado={minAceitas}
+          tone="indigo"
+          highlight
+        />
+        <CenarioCard
+          kicker="Otimista"
+          subtitle="se fechar todas as enviadas"
+          saldo12m={finalOtimista}
+          delta={ganhoOtimista}
+          deltaPct={pctOtimista}
+          mesApertado={minOtimista}
+          tone="amber"
+        />
       </div>
     </section>
   )
 }
 
-function ResumoCenario({ kicker, value, hint, highlight }: {
+function CenarioCard({ kicker, subtitle, saldo12m, delta, deltaPct, mesApertado, tone, highlight }: {
   kicker: string
-  value: number
-  hint?: string
+  subtitle: string
+  saldo12m: number
+  delta?: number
+  deltaPct?: number
+  mesApertado: number
+  tone: 'slate' | 'indigo' | 'amber'
   highlight?: boolean
 }) {
-  const positivo = value >= 0
+  const positivo = saldo12m >= 0
+  const corPrimaria =
+    tone === 'slate'  ? 'text-white' :
+    tone === 'indigo' ? 'text-white' :
+                        'text-white'
+  const corDot =
+    tone === 'slate'  ? 'bg-slate-300/60' :
+    tone === 'indigo' ? 'bg-indigo-300' :
+                        'bg-amber-300'
   return (
     <div className={`bg-[#0a0c11] p-6 ${highlight ? 'ring-1 ring-inset ring-indigo-400/20' : ''}`}>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
+        <span className={`w-1.5 h-1.5 rounded-full ${corDot}`} />
         <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-300/70">{kicker}</p>
-        {highlight && <span className="text-[9px] font-mono uppercase tracking-widest text-indigo-300">primário</span>}
+        {highlight && <span className="ml-auto text-[9px] font-mono uppercase tracking-widest text-indigo-300">primário</span>}
       </div>
-      <p className={`mt-3 font-display text-2xl tracking-tight ${positivo ? 'text-white' : 'text-rose-200'}`}
+      <p className="text-slate-300/70 text-[11px] mt-1">{subtitle}</p>
+
+      <p className={`mt-4 font-display text-2xl tracking-tight ${positivo ? corPrimaria : 'text-rose-200'}`}
          style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
         <span className="text-slate-300/60 text-sm font-mono mr-1">R$</span>
-        <span className="font-numeric">{numToMask(value)}</span>
+        <span className="font-numeric">{numToMask(saldo12m)}</span>
+        <span className="text-slate-300/50 text-xs font-mono ml-2">/12m</span>
       </p>
-      {hint && <p className="text-slate-300 text-xs mt-1.5 uppercase tracking-wider">{hint}</p>}
+
+      {delta !== undefined && delta > 0 && (
+        <p className={`mt-2 text-[11px] font-mono inline-flex items-center gap-1
+          ${tone === 'amber' ? 'text-amber-300' : 'text-emerald-300'}`}>
+          <ArrowUpRight className="w-3 h-3" />
+          + R$ {numToMask(delta)} {deltaPct !== undefined && Number.isFinite(deltaPct) && Math.abs(deltaPct) > 0 && (
+            <span className="opacity-80">· +{deltaPct.toFixed(0)}%</span>
+          )}
+        </p>
+      )}
+
+      <div className="mt-4 pt-3 border-t border-white/[0.05]">
+        <p className="text-[10px] font-mono uppercase tracking-wider text-slate-300/60">Mês mais apertado</p>
+        <p className={`text-sm mt-0.5 font-numeric ${mesApertado >= 0 ? 'text-slate-200' : 'text-rose-300'}`}>
+          R$ {numToMask(mesApertado)}
+        </p>
+      </div>
     </div>
   )
 }

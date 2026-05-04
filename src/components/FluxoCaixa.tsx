@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Loader2, RefreshCw, ArrowUpRight, ArrowDownRight,
   AlertTriangle, Sparkles, TrendingDown,
-  CheckCircle2, Clock, XCircle, FileText,
+  CheckCircle2, Clock, XCircle,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { numToMask } from '../lib/utils'

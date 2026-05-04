@@ -71,17 +71,21 @@ export default function DashboardHome() {
       supabase.from('mensalidades').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
     ])
 
+    // Ajustes manuais de caixa
+    const { data: ajustesData } = await supabase.from('ajustes_caixa').select('valor')
+
     const expenses      = [...(expensesAvulsas ?? []), ...(expensesFixas ?? [])]
     const entradas      = (entriesMes    ?? []).reduce((s, e) => s + (e.valor ?? 0), 0)
     const pendentes     = (pendentesAll  ?? []).reduce((s, e) => s + (e.valor ?? 0), 0)
     const despesas      = expenses.filter(e => e.pago).reduce((s, e) => s + (e.valor ?? 0), 0)
     const valorProjetos = (projectsValor ?? []).reduce((s, p) => s + ((p.valor as number) ?? 0), 0)
 
-    // Saldo em caixa: tudo que já entrou (recebido) menos tudo que já foi pago (avulsa pago + fixa pago)
+    // Saldo em caixa: tudo que já entrou (recebido) menos tudo que já foi pago (avulsa pago + fixa pago) + ajustes manuais
     const totalEntradasLifetime = (entriesAllRecebidas ?? []).reduce((s, e) => s + (Number(e.valor) || 0), 0)
     const totalAvulsasPagasLifetime = (expensesAvulsasAllPagas ?? []).reduce((s, e) => s + (Number(e.valor) || 0), 0)
     const fixasPagasMes = (expensesFixas ?? []).filter(e => e.pago).reduce((s, e) => s + (Number(e.valor) || 0), 0)
-    const saldoCaixa = totalEntradasLifetime - totalAvulsasPagasLifetime - fixasPagasMes
+    const totalAjustes = (ajustesData ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0)
+    const saldoCaixa = totalEntradasLifetime - totalAvulsasPagasLifetime - fixasPagasMes + totalAjustes
 
     setStats({
       entradas, pendentes, despesas,

@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Loader2, RefreshCw, ArrowUpRight, ArrowDownRight,
   AlertTriangle, Sparkles, TrendingDown,
-  CheckCircle2, Clock, XCircle,
+  CheckCircle2, Clock, XCircle, Pencil, X, Trash2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { numToMask } from '../lib/utils'
+import { numToMask, maskBRL, parseBRL, formatDate } from '../lib/utils'
 
 const MES_NOME       = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const MES_CURTO      = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
@@ -17,6 +17,7 @@ interface ExpenseRow     { id: string; descricao: string; valor: number; data: s
 interface EntryRow       { id: string; nome_projeto: string; valor: number; data: string; status: 'pendente' | 'recebido' }
 interface ProposalRow    { id: string; titulo: string; cliente_nome: string; setup_valor: number; mensalidade_valor: number; status: string; recorrencia: 'mensal' | 'semestral' | 'anual'; data_envio: string | null }
 interface ProjectRow     { id: string; nome_projeto: string; nome_cliente: string | null; valor: number | null; valor_recebido: number | null; data_termino: string | null }
+interface AjusteCaixaRow { id: string; valor: number; descricao: string | null; data: string }
 
 interface MovimentoFuturo {
   id: string
@@ -55,6 +56,8 @@ export default function FluxoCaixa() {
   const [entries, setEntries]           = useState<EntryRow[]>([])
   const [proposals, setProposals]       = useState<ProposalRow[]>([])
   const [projects, setProjects]         = useState<ProjectRow[]>([])
+  const [ajustes, setAjustes]           = useState<AjusteCaixaRow[]>([])
+  const [modalAjuste, setModalAjuste]   = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -66,20 +69,42 @@ export default function FluxoCaixa() {
       { data: ent,  error: e3 },
       { data: prop, error: e4 },
       { data: proj, error: e5 },
+      { data: aj,   error: e6 },
     ] = await Promise.all([
       supabase.from('mensalidades').select('id,cliente_nome,valor,dia_vencimento,status').eq('status', 'ativo'),
       supabase.from('expenses').select('id,descricao,valor,data,tipo,dia_vencimento,pago'),
       supabase.from('project_entries').select('id,nome_projeto,valor,data,status'),
       supabase.from('proposals').select('id,titulo,cliente_nome,setup_valor,mensalidade_valor,status,recorrencia,data_envio'),
       supabase.from('projects').select('id,nome_projeto,nome_cliente,valor,valor_recebido,data_termino').order('created_at', { ascending: false }),
+      supabase.from('ajustes_caixa').select('id,valor,descricao,data').order('data', { ascending: false }),
     ])
-    if (e1 || e2 || e3 || e4 || e5) setError('Erro ao carregar dados financeiros.')
+    if (e1 || e2 || e3 || e4 || e5 || e6) setError('Erro ao carregar dados financeiros.')
     setMensalidades((mens ?? []) as MensalidadeRow[])
     setExpenses    ((exp  ?? []) as ExpenseRow[])
     setEntries     ((ent  ?? []) as EntryRow[])
     setProposals   ((prop ?? []) as ProposalRow[])
     setProjects    ((proj ?? []) as ProjectRow[])
+    setAjustes     ((aj   ?? []) as AjusteCaixaRow[])
     setLoading(false)
+  }
+
+  async function lancarAjuste(novoSaldoReal: number, descricao: string) {
+    const calculado = saldoCaixaCalculado
+    const diff = novoSaldoReal - calculado
+    if (Math.abs(diff) < 0.01) { setModalAjuste(false); return }
+    const { error } = await supabase.from('ajustes_caixa').insert({
+      valor: diff,
+      descricao: descricao || `Correção manual em ${new Date().toLocaleDateString('pt-BR')}`,
+    })
+    if (error) { setError('Erro ao salvar ajuste.'); return }
+    setModalAjuste(false)
+    await load()
+  }
+
+  async function deletarAjuste(id: string) {
+    const { error } = await supabase.from('ajustes_caixa').delete().eq('id', id)
+    if (error) { setError('Erro ao excluir ajuste.'); return }
+    setAjustes(a => a.filter(x => x.id !== id))
   }
 
   // ── Cálculos ────────────────────────────────────────────────────────────────
@@ -88,13 +113,20 @@ export default function FluxoCaixa() {
   const inicioMes = useMemo(() => new Date(hoje.getFullYear(), hoje.getMonth(), 1), [hoje])
   const fimMes    = useMemo(() => new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0), [hoje])
 
-  // Saldo em caixa lifetime
-  const saldoCaixa = useMemo(() => {
+  // Saldo em caixa lifetime — cálculo automático
+  const saldoCaixaCalculado = useMemo(() => {
     const entradas = entries.filter(e => e.status === 'recebido').reduce((s, e) => s + Number(e.valor || 0), 0)
     const avulsas  = expenses.filter(e => e.tipo === 'avulsa' && e.pago).reduce((s, e) => s + Number(e.valor || 0), 0)
     const fixasPagas = expenses.filter(e => e.tipo === 'fixa' && e.pago).reduce((s, e) => s + Number(e.valor || 0), 0)
     return entradas - avulsas - fixasPagas
   }, [entries, expenses])
+
+  const totalAjustes = useMemo(() =>
+    ajustes.reduce((s, a) => s + Number(a.valor || 0), 0)
+  , [ajustes])
+
+  // Saldo final = calculado + ajustes manuais
+  const saldoCaixa = saldoCaixaCalculado + totalAjustes
 
   // Mês corrente
   const mesEntradas = useMemo(() =>
@@ -347,9 +379,17 @@ export default function FluxoCaixa() {
           <div className={`absolute -top-32 -right-24 w-[420px] h-[420px] rounded-full blur-3xl pointer-events-none
             ${positivo ? 'bg-emerald-500/[0.08]' : 'bg-rose-500/[0.08]'}`} />
 
-          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-300/70">
-            Saldo em caixa
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-300/70">
+              Saldo em caixa
+            </p>
+            <button
+              onClick={() => setModalAjuste(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider text-slate-300 bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:text-white transition-colors">
+              <Pencil className="w-3 h-3" />
+              corrigir
+            </button>
+          </div>
 
           <div className="mt-7 flex items-baseline gap-3 relative">
             <span className={`text-3xl font-display ${positivo ? 'text-emerald-300' : 'text-rose-300'}`}
@@ -399,6 +439,35 @@ export default function FluxoCaixa() {
               ? `Em 30 dias o caixa deve subir para R$ ${numToMask(saldoProj30)}. Trajetória positiva.`
               : `Em 30 dias o caixa deve cair para R$ ${numToMask(saldoProj30)}. Atenção às próximas saídas.`}
           </p>
+
+          {/* Histórico de ajustes (compacto) */}
+          {ajustes.length > 0 && (
+            <div className="mt-6 pt-5 border-t border-white/[0.05]">
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-[9px] font-mono uppercase tracking-[0.25em] text-slate-300/60">
+                  Correções aplicadas · {ajustes.length}
+                </p>
+                <span className={`font-mono text-[10px] ${totalAjustes >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  {totalAjustes >= 0 ? '+' : '−'} R$ {numToMask(Math.abs(totalAjustes))}
+                </span>
+              </div>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto -mr-2 pr-2">
+                {ajustes.map(a => (
+                  <div key={a.id} className="group flex items-center gap-3 text-[11px]">
+                    <span className="text-slate-300/60 font-mono">{formatDate(a.data)}</span>
+                    <span className="flex-1 min-w-0 truncate text-slate-300">{a.descricao || 'correção'}</span>
+                    <span className={`font-numeric ${Number(a.valor) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      {Number(a.valor) >= 0 ? '+' : '−'} R$ {numToMask(Math.abs(Number(a.valor)))}
+                    </span>
+                    <button onClick={() => deletarAjuste(a.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-rose-300">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* KPIs */}
@@ -505,6 +574,141 @@ export default function FluxoCaixa() {
         <HistoricoChart historico={historico} />
       )}
 
+      {modalAjuste && (
+        <ModalAjusteCaixa
+          saldoAtual={saldoCaixa}
+          saldoCalculado={saldoCaixaCalculado}
+          totalAjustes={totalAjustes}
+          onSave={lancarAjuste}
+          onClose={() => setModalAjuste(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Modal de correção de caixa ────────────────────────────────────────────────
+
+function ModalAjusteCaixa({ saldoAtual, saldoCalculado, totalAjustes, onSave, onClose }: {
+  saldoAtual: number
+  saldoCalculado: number
+  totalAjustes: number
+  onSave: (novoSaldoReal: number, descricao: string) => Promise<void>
+  onClose: () => void
+}) {
+  const [valorReal, setValorReal] = useState(numToMask(saldoAtual))
+  const [descricao, setDescricao] = useState('')
+  const [saving, setSaving]       = useState(false)
+
+  const valorRealNum = parseBRL(valorReal) ?? 0
+  const ajusteNecessario = valorRealNum - saldoAtual
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    await onSave(valorRealNum, descricao.trim())
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-[#0a0c11] border border-white/[0.07] rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up">
+        <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.05]">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-indigo-300/80">
+              Correção · saldo em caixa
+            </p>
+            <h2 className="font-display text-2xl text-white tracking-tight mt-1"
+                style={{ fontVariationSettings: '"opsz" 96, "SOFT" 30' }}>
+              Ajustar saldo
+            </h2>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/[0.05] transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="px-7 py-6 space-y-5">
+
+          {/* Snapshot atual */}
+          <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-4 space-y-1.5 text-[11px] font-mono">
+            <div className="flex justify-between">
+              <span className="text-slate-300/70">calculado pelo sistema</span>
+              <span className="text-slate-200">R$ {numToMask(saldoCalculado)}</span>
+            </div>
+            {totalAjustes !== 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-300/70">correções já aplicadas</span>
+                <span className={totalAjustes >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
+                  {totalAjustes >= 0 ? '+' : '−'} R$ {numToMask(Math.abs(totalAjustes))}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between pt-1.5 border-t border-white/[0.05]">
+              <span className="text-slate-300">saldo exibido hoje</span>
+              <span className="text-white font-semibold">R$ {numToMask(saldoAtual)}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300 mb-2">
+              Saldo real (extrato bancário)
+            </label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-sm font-mono">R$</span>
+              <input
+                className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white/[0.03] border border-white/[0.07]
+                           text-white text-2xl font-display font-numeric placeholder-slate-500
+                           focus:outline-none focus:border-white/20 transition-colors"
+                placeholder="0,00"
+                value={valorReal}
+                onChange={e => setValorReal(maskBRL(e.target.value))}
+                inputMode="numeric"
+                autoFocus
+              />
+            </div>
+            {Math.abs(ajusteNecessario) >= 0.01 && (
+              <p className={`text-[11px] font-mono mt-2 ${ajusteNecessario >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                {ajusteNecessario >= 0 ? '↑' : '↓'} ajuste de {ajusteNecessario >= 0 ? '+' : '−'} R$ {numToMask(Math.abs(ajusteNecessario))}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300 mb-2">
+              Motivo da correção (opcional)
+            </label>
+            <input
+              className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.07]
+                         text-white text-sm placeholder-slate-500 focus:outline-none focus:border-white/20 transition-colors"
+              placeholder="ex: conferência com extrato bancário"
+              value={descricao}
+              onChange={e => setDescricao(e.target.value)}
+            />
+          </div>
+
+          <p className="text-slate-300/60 text-[11px] leading-relaxed">
+            A correção é registrada como um ajuste e somada ao cálculo automático.
+            Você pode aplicar quantas correções precisar — todas ficam visíveis no histórico.
+          </p>
+
+          <div className="flex gap-3 pt-2">
+            <button type="submit" disabled={saving}
+              className="flex-1 py-3 rounded-full text-slate-900 text-sm font-semibold bg-white
+                         hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed
+                         transition-colors">
+              {saving
+                ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Salvando</span>
+                : 'Aplicar correção'}
+            </button>
+            <button type="button" onClick={onClose} disabled={saving}
+              className="px-5 py-3 rounded-full text-slate-300 text-sm font-medium bg-transparent border border-white/[0.08] hover:border-white/20 transition-colors">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

@@ -8,7 +8,8 @@ import { supabase } from '../lib/supabase'
 import { numToMask, formatDate } from '../lib/utils'
 
 interface Stats {
-  saldo: number; entradas: number; pendentes: number; despesas: number
+  saldoCaixa: number; saldoMes: number
+  entradas: number; pendentes: number; despesas: number
   clientes: number; projetos: number; mensalidades: number; valorProjetos: number
 }
 
@@ -20,7 +21,7 @@ const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho'
 const DAYS_PT   = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 
 export default function DashboardHome() {
-  const [stats,    setStats]    = useState<Stats>({ saldo:0, entradas:0, pendentes:0, despesas:0, clientes:0, projetos:0, mensalidades:0, valorProjetos:0 })
+  const [stats,    setStats]    = useState<Stats>({ saldoCaixa:0, saldoMes:0, entradas:0, pendentes:0, despesas:0, clientes:0, projetos:0, mensalidades:0, valorProjetos:0 })
   const [recent,   setRecent]   = useState<Movement[]>([])
   const [loading,  setLoading]  = useState(true)
 
@@ -40,8 +41,10 @@ export default function DashboardHome() {
     const [
       { data: entries },
       { data: entriesMes },
+      { data: entriesAllRecebidas },
       { data: pendentesAll },
       { data: expensesAvulsas },
+      { data: expensesAvulsasAllPagas },
       { data: expensesFixas },
       { data: projectsValor },
       { count: cClientes },
@@ -52,9 +55,15 @@ export default function DashboardHome() {
       supabase.from('project_entries').select('valor,status,data,nome_projeto,id').order('data', { ascending: false }).limit(20),
       // Entradas RECEBIDAS no mês corrente — entram no saldo do mês
       supabase.from('project_entries').select('valor,data').eq('status', 'recebido').gte('data', inicioMes).lte('data', fimMes),
+      // Todas as entradas RECEBIDAS (qualquer data) — saldo em caixa lifetime
+      supabase.from('project_entries').select('valor').eq('status', 'recebido'),
       // Pendentes (a receber) — qualquer data, não entra no saldo
       supabase.from('project_entries').select('valor').eq('status', 'pendente'),
+      // Despesas avulsas do mês corrente
       supabase.from('expenses').select('valor,data,descricao,id,tipo,pago').eq('tipo', 'avulsa').gte('data', inicioMes).lte('data', fimMes),
+      // Todas as despesas avulsas pagas (qualquer data) — saldo em caixa lifetime
+      supabase.from('expenses').select('valor').eq('tipo', 'avulsa').eq('pago', true),
+      // Despesas fixas (sempre todas — recorrentes)
       supabase.from('expenses').select('valor,data,descricao,id,tipo,pago').eq('tipo', 'fixa'),
       supabase.from('projects').select('valor'),
       supabase.from('clients').select('*',      { count: 'exact', head: true }),
@@ -68,9 +77,16 @@ export default function DashboardHome() {
     const despesas      = expenses.filter(e => e.pago).reduce((s, e) => s + (e.valor ?? 0), 0)
     const valorProjetos = (projectsValor ?? []).reduce((s, p) => s + ((p.valor as number) ?? 0), 0)
 
+    // Saldo em caixa: tudo que já entrou (recebido) menos tudo que já foi pago (avulsa pago + fixa pago)
+    const totalEntradasLifetime = (entriesAllRecebidas ?? []).reduce((s, e) => s + (Number(e.valor) || 0), 0)
+    const totalAvulsasPagasLifetime = (expensesAvulsasAllPagas ?? []).reduce((s, e) => s + (Number(e.valor) || 0), 0)
+    const fixasPagasMes = (expensesFixas ?? []).filter(e => e.pago).reduce((s, e) => s + (Number(e.valor) || 0), 0)
+    const saldoCaixa = totalEntradasLifetime - totalAvulsasPagasLifetime - fixasPagasMes
+
     setStats({
       entradas, pendentes, despesas,
-      saldo: entradas - despesas,
+      saldoMes:   entradas - despesas,
+      saldoCaixa,
       valorProjetos,
       clientes:     cClientes ?? 0,
       projetos:     cProjetos ?? 0,
@@ -86,10 +102,11 @@ export default function DashboardHome() {
     setLoading(false)
   }
 
-  const positive = stats.saldo >= 0
-  const total    = stats.entradas + stats.despesas
-  const pctEnt   = total > 0 ? (stats.entradas / total) * 100 : 0
-  const pctDesp  = total > 0 ? (stats.despesas / total) * 100 : 0
+  const positive   = stats.saldoCaixa >= 0
+  const mesPos     = stats.saldoMes >= 0
+  const total      = stats.entradas + stats.despesas
+  const pctEnt     = total > 0 ? (stats.entradas / total) * 100 : 0
+  const pctDesp    = total > 0 ? (stats.despesas / total) * 100 : 0
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -124,14 +141,23 @@ export default function DashboardHome() {
             ${positive ? 'bg-emerald-400' : 'bg-red-400'}`} />
           <div className="relative">
             <p className={`text-[10px] font-bold uppercase tracking-widest mb-3 ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
-              Saldo Líquido
+              Saldo em Caixa
             </p>
             <p className={`text-4xl font-extrabold tracking-tight font-numeric mb-1 ${positive ? 'text-emerald-300' : 'text-red-300'}`}>
-              R$ {numToMask(stats.saldo)}
+              R$ {numToMask(stats.saldoCaixa)}
             </p>
-            <p className="text-slate-300 text-xs font-medium">entradas − despesas</p>
+            <p className="text-slate-300 text-xs font-medium">acumulado · tudo recebido − pago</p>
+
+            {/* Delta do mês */}
+            <div className="mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+              <span className="text-[10px] uppercase tracking-wider text-slate-300 font-medium">no mês</span>
+              <span className={`text-xs font-numeric font-semibold ${mesPos ? 'text-emerald-300' : 'text-red-300'}`}>
+                {mesPos ? '+' : '−'} R$ {numToMask(Math.abs(stats.saldoMes))}
+              </span>
+            </div>
+
             {total > 0 && (
-              <div className="mt-5 space-y-1.5">
+              <div className="mt-4 space-y-1.5">
                 <div className="flex text-[10px] text-slate-300 justify-between font-medium">
                   <span>Ent. {pctEnt.toFixed(0)}%</span>
                   <span>Desp. {pctDesp.toFixed(0)}%</span>

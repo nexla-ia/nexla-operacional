@@ -5,7 +5,7 @@ create table if not exists public.proposals (
   id              uuid primary key default uuid_generate_v4(),
   user_id         uuid references auth.users (id) on delete set null,
 
-  client_id       uuid references public.clients (id) on delete set null,
+  client_id       uuid,
   cliente_nome    text not null,
   titulo          text not null,
   descricao       text,

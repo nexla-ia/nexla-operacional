@@ -13,6 +13,7 @@ const EMPTY: Omit<Project, 'id'> = {
   nome_cliente:   '',
   numero_cliente: '',
   valor:          '',
+  valor_recebido: '',
   data_termino:   '',
   descricao:      '',
   client_id:      undefined,
@@ -28,6 +29,7 @@ function fromDB(row: Record<string, unknown>): Project {
     nome_cliente:   (row.nome_cliente as string) ?? '',
     numero_cliente: (row.numero_cliente as string) ?? '',
     valor:          numToMask(row.valor as number | null),
+    valor_recebido: numToMask(row.valor_recebido as number | null),
     data_termino:   (row.data_termino as string) ?? '',
     descricao:      (row.descricao as string) ?? '',
     client_id:      (row.client_id as string) || undefined,
@@ -41,6 +43,7 @@ function toDB(data: Omit<Project, 'id'>) {
     nome_cliente:   data.nome_cliente  || null,
     numero_cliente: data.numero_cliente || null,
     valor:          parseBRL(data.valor),
+    valor_recebido: parseBRL(data.valor_recebido) ?? 0,
     data_termino:   data.data_termino  || null,
     descricao:      data.descricao     || null,
     client_id:      data.client_id     || null,
@@ -185,7 +188,7 @@ function ProjectModal({ initial, clients, onSave, onClose, editing }: ModalProps
           {/* Valor | Data */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Valor (R$)</label>
+              <label className={labelCls}>Valor total (R$)</label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm select-none">R$</span>
                 <input
@@ -207,6 +210,24 @@ function ProjectModal({ initial, clients, onSave, onClose, editing }: ModalProps
                 style={{ colorScheme: 'dark' }}
               />
             </div>
+          </div>
+
+          {/* Valor recebido */}
+          <div>
+            <label className={labelCls}>Valor já recebido (R$)</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm select-none">R$</span>
+              <input
+                className={inputCls + ' pl-9'}
+                placeholder="0,00"
+                value={form.valor_recebido}
+                onChange={e => set('valor_recebido', maskBRL(e.target.value))}
+                inputMode="numeric"
+              />
+            </div>
+            <p className="text-slate-300/70 text-[11px] mt-1.5">
+              Quanto desse projeto já foi pago. Use para acompanhar pagamentos parciais.
+            </p>
           </div>
 
           {/* Descrição */}
@@ -263,6 +284,12 @@ interface CardProps {
 }
 
 function ProjectCard({ project, onEdit, onDelete }: CardProps) {
+  const valorTotal     = parseBRL(project.valor) ?? 0
+  const valorRecebido  = parseBRL(project.valor_recebido) ?? 0
+  const valorRestante  = Math.max(0, valorTotal - valorRecebido)
+  const pctRecebido    = valorTotal > 0 ? Math.min(100, (valorRecebido / valorTotal) * 100) : 0
+  const quitado        = valorTotal > 0 && valorRecebido >= valorTotal
+
   return (
     <div className="group flex flex-col gap-4 p-5 rounded-2xl bg-slate-900/70 border border-white/[0.07]
                     hover:border-white/[0.13] backdrop-blur-sm transition-all duration-200">
@@ -310,6 +337,27 @@ function ProjectCard({ project, onEdit, onDelete }: CardProps) {
           </div>
         )}
       </div>
+
+      {/* Progresso de recebimento */}
+      {valorTotal > 0 && (
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-[11px] font-medium">
+            <span className={quitado ? 'text-emerald-300' : 'text-slate-300'}>
+              {quitado ? '✓ Quitado' : `Recebido R$ ${project.valor_recebido || '0,00'}`}
+            </span>
+            <span className={`font-numeric ${valorRestante > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
+              {valorRestante > 0 ? `falta R$ ${numToMask(valorRestante)}` : '100%'}
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700
+                ${quitado ? 'bg-emerald-500' : 'bg-gradient-to-r from-emerald-500 to-emerald-400'}`}
+              style={{ width: `${pctRecebido}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {project.descricao && (
         <p className="text-slate-300 text-xs leading-relaxed line-clamp-2">{project.descricao}</p>

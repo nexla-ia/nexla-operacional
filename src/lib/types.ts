@@ -20,6 +20,7 @@ export interface Project {
   nome_cliente: string
   numero_cliente: string
   valor: string
+  valor_recebido: string
   data_termino: string
   descricao: string
   client_id?: string

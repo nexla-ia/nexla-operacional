@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Loader2, RefreshCw, ArrowUpRight, ArrowDownRight,
   AlertTriangle, Sparkles, TrendingDown,
+  CheckCircle2, Clock, XCircle, FileText,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { numToMask } from '../lib/utils'
@@ -15,6 +16,7 @@ interface MensalidadeRow { id: string; cliente_nome: string; valor: number; dia_
 interface ExpenseRow     { id: string; descricao: string; valor: number; data: string | null; tipo: 'fixa' | 'avulsa'; dia_vencimento: number | null; pago: boolean }
 interface EntryRow       { id: string; nome_projeto: string; valor: number; data: string; status: 'pendente' | 'recebido' }
 interface ProposalRow    { id: string; titulo: string; cliente_nome: string; setup_valor: number; mensalidade_valor: number; status: string; recorrencia: 'mensal' | 'semestral' | 'anual'; data_envio: string | null }
+interface ProjectRow     { id: string; nome_projeto: string; nome_cliente: string | null; valor: number | null; valor_recebido: number | null; data_termino: string | null }
 
 interface MovimentoFuturo {
   id: string
@@ -52,6 +54,7 @@ export default function FluxoCaixa() {
   const [expenses, setExpenses]         = useState<ExpenseRow[]>([])
   const [entries, setEntries]           = useState<EntryRow[]>([])
   const [proposals, setProposals]       = useState<ProposalRow[]>([])
+  const [projects, setProjects]         = useState<ProjectRow[]>([])
 
   useEffect(() => { load() }, [])
 
@@ -62,17 +65,20 @@ export default function FluxoCaixa() {
       { data: exp,  error: e2 },
       { data: ent,  error: e3 },
       { data: prop, error: e4 },
+      { data: proj, error: e5 },
     ] = await Promise.all([
       supabase.from('mensalidades').select('id,cliente_nome,valor,dia_vencimento,status').eq('status', 'ativo'),
       supabase.from('expenses').select('id,descricao,valor,data,tipo,dia_vencimento,pago'),
       supabase.from('project_entries').select('id,nome_projeto,valor,data,status'),
       supabase.from('proposals').select('id,titulo,cliente_nome,setup_valor,mensalidade_valor,status,recorrencia,data_envio'),
+      supabase.from('projects').select('id,nome_projeto,nome_cliente,valor,valor_recebido,data_termino').order('created_at', { ascending: false }),
     ])
-    if (e1 || e2 || e3 || e4) setError('Erro ao carregar dados financeiros.')
+    if (e1 || e2 || e3 || e4 || e5) setError('Erro ao carregar dados financeiros.')
     setMensalidades((mens ?? []) as MensalidadeRow[])
     setExpenses    ((exp  ?? []) as ExpenseRow[])
     setEntries     ((ent  ?? []) as EntryRow[])
     setProposals   ((prop ?? []) as ProposalRow[])
+    setProjects    ((proj ?? []) as ProjectRow[])
     setLoading(false)
   }
 
@@ -469,6 +475,16 @@ export default function FluxoCaixa() {
         </div>
       </section>
 
+      {/* Projetos em andamento */}
+      {projects.length > 0 && (
+        <ProjetosAndamento projects={projects} />
+      )}
+
+      {/* Pipeline de propostas */}
+      {proposals.length > 0 && (
+        <PipelinePropostas proposals={proposals} />
+      )}
+
       {/* Projeção 12m */}
       <ProjecaoChart12m projecao={projecao} custoFixo={custoFixo} />
 
@@ -814,6 +830,279 @@ function HistoricoChart({ historico }: {
         </svg>
       </div>
     </section>
+  )
+}
+
+// ── Projetos em andamento ─────────────────────────────────────────────────────
+
+function ProjetosAndamento({ projects }: { projects: ProjectRow[] }) {
+  // Calcula totais
+  const stats = useMemo(() => {
+    let total = 0, recebido = 0, restante = 0, quitados = 0, ativos = 0
+    projects.forEach(p => {
+      const t = Number(p.valor || 0)
+      const r = Number(p.valor_recebido || 0)
+      total += t
+      recebido += r
+      const rest = Math.max(0, t - r)
+      restante += rest
+      if (t > 0 && r >= t) quitados++
+      else if (t > 0) ativos++
+    })
+    return { total, recebido, restante, quitados, ativos }
+  }, [projects])
+
+  // Ordena: a receber > 0 primeiro (mais urgente), depois quitados
+  const ordenados = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      const restA = Math.max(0, Number(a.valor || 0) - Number(a.valor_recebido || 0))
+      const restB = Math.max(0, Number(b.valor || 0) - Number(b.valor_recebido || 0))
+      return restB - restA
+    })
+  }, [projects])
+
+  return (
+    <section className="mb-12">
+      <div className="flex items-end justify-between mb-6 flex-wrap gap-4">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-300/70">
+            Em andamento · {stats.ativos} {stats.ativos === 1 ? 'projeto' : 'projetos'}
+          </p>
+          <h2 className="font-display text-3xl text-white mt-1.5 tracking-tight"
+              style={{ fontVariationSettings: '"opsz" 96, "SOFT" 30' }}>
+            Projetos a <span className="italic text-slate-300/80" style={{ fontVariationSettings: '"opsz" 96, "SOFT" 80' }}>receber</span>
+          </h2>
+        </div>
+        <div className="flex items-center gap-6 text-right">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-300/70">Falta receber</p>
+            <p className="font-display text-2xl text-amber-200 mt-0.5"
+               style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
+              <span className="text-slate-300/60 text-sm font-mono mr-1">R$</span>
+              <span className="font-numeric">{numToMask(stats.restante)}</span>
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-300/70">Já recebido</p>
+            <p className="font-display text-2xl text-emerald-200 mt-0.5"
+               style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
+              <span className="text-slate-300/60 text-sm font-mono mr-1">R$</span>
+              <span className="font-numeric">{numToMask(stats.recebido)}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {ordenados.map(p => {
+          const total    = Number(p.valor || 0)
+          const recebido = Number(p.valor_recebido || 0)
+          const restante = Math.max(0, total - recebido)
+          const pct      = total > 0 ? Math.min(100, (recebido / total) * 100) : 0
+          const quitado  = total > 0 && recebido >= total
+
+          return (
+            <div key={p.id} className="bg-[#0a0c11] border border-white/[0.06] rounded-2xl p-5">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60 truncate">
+                    {p.nome_cliente || 'sem cliente'}
+                  </p>
+                  <h3 className="font-display text-xl text-white tracking-tight mt-1 leading-tight line-clamp-2"
+                      style={{ fontVariationSettings: '"opsz" 24, "SOFT" 40' }}>
+                    {p.nome_projeto}
+                  </h3>
+                </div>
+                {quitado && (
+                  <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/20">
+                    <CheckCircle2 className="w-3 h-3" /> quitado
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60">Valor</p>
+                  <p className="font-display text-lg text-white mt-0.5"
+                     style={{ fontVariationSettings: '"opsz" 24, "SOFT" 30' }}>
+                    <span className="text-slate-300/60 text-xs font-mono mr-0.5">R$</span>
+                    <span className="font-numeric">{numToMask(total)}</span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60">
+                    {restante > 0 ? 'Falta' : 'Recebido'}
+                  </p>
+                  <p className={`font-display text-lg mt-0.5 ${restante > 0 ? 'text-amber-200' : 'text-emerald-200'}`}
+                     style={{ fontVariationSettings: '"opsz" 24, "SOFT" 30' }}>
+                    <span className="text-slate-300/60 text-xs font-mono mr-0.5">R$</span>
+                    <span className="font-numeric">{numToMask(restante > 0 ? restante : recebido)}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Barra de progresso */}
+              {total > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-[10px] font-mono mb-1.5">
+                    <span className="text-slate-300/70 uppercase tracking-wider">Recebido</span>
+                    <span className={quitado ? 'text-emerald-300' : 'text-slate-300'}>{pct.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700
+                        ${quitado ? 'bg-emerald-500' : 'bg-gradient-to-r from-emerald-500 to-emerald-400'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+// ── Pipeline de propostas ─────────────────────────────────────────────────────
+
+function PipelinePropostas({ proposals }: { proposals: ProposalRow[] }) {
+  const aceitas  = proposals.filter(p => p.status === 'aceita')
+  const enviadas = proposals.filter(p => p.status === 'enviada')
+  const recusadas = proposals.filter(p => p.status === 'recusada')
+
+  const sumMens  = (arr: ProposalRow[]) => arr.reduce((s, p) => s + Number(p.mensalidade_valor || 0), 0)
+  const sumSetup = (arr: ProposalRow[]) => arr.reduce((s, p) => s + Number(p.setup_valor || 0), 0)
+
+  const aceitasMens  = sumMens(aceitas)
+  const aceitasSetup = sumSetup(aceitas)
+  const enviadasMens  = sumMens(enviadas)
+  const enviadasSetup = sumSetup(enviadas)
+
+  if (aceitas.length === 0 && enviadas.length === 0) return null
+
+  return (
+    <section className="mb-12">
+      <div className="flex items-end justify-between mb-6 flex-wrap gap-4">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-300/70">
+            Pipeline · {aceitas.length + enviadas.length} {aceitas.length + enviadas.length === 1 ? 'proposta' : 'propostas'}
+          </p>
+          <h2 className="font-display text-3xl text-white mt-1.5 tracking-tight"
+              style={{ fontVariationSettings: '"opsz" 96, "SOFT" 30' }}>
+            Propostas em <span className="italic text-slate-300/80" style={{ fontVariationSettings: '"opsz" 96, "SOFT" 80' }}>tramitação</span>
+          </h2>
+        </div>
+        {recusadas.length > 0 && (
+          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300/50 inline-flex items-center gap-1.5">
+            <XCircle className="w-3 h-3" />
+            {recusadas.length} recusada{recusadas.length === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-white/[0.06] border border-white/[0.06] rounded-3xl overflow-hidden">
+        <ColunaPropostas
+          titulo="Aceitas"
+          subtitulo="já fechadas, geram receita garantida"
+          icon={CheckCircle2}
+          tone="emerald"
+          mens={aceitasMens}
+          setup={aceitasSetup}
+          itens={aceitas}
+        />
+        <ColunaPropostas
+          titulo="Enviadas"
+          subtitulo="aguardando resposta · cenário otimista"
+          icon={Clock}
+          tone="indigo"
+          mens={enviadasMens}
+          setup={enviadasSetup}
+          itens={enviadas}
+        />
+      </div>
+    </section>
+  )
+}
+
+function ColunaPropostas({ titulo, subtitulo, icon: Icon, tone, mens, setup, itens }: {
+  titulo: string
+  subtitulo: string
+  icon: typeof CheckCircle2
+  tone: 'emerald' | 'indigo'
+  mens: number
+  setup: number
+  itens: ProposalRow[]
+}) {
+  const corPrincipal = tone === 'emerald' ? 'text-emerald-300' : 'text-indigo-300'
+  const corDot       = tone === 'emerald' ? 'bg-emerald-400'    : 'bg-indigo-400'
+
+  return (
+    <div className="bg-[#0a0c11] p-6 sm:p-8">
+      <div className="flex items-start justify-between mb-5">
+        <div className="flex items-start gap-3">
+          <div className={`mt-1 w-8 h-8 rounded-full flex items-center justify-center
+            ${tone === 'emerald' ? 'bg-emerald-500/15' : 'bg-indigo-500/15'}`}>
+            <Icon className={`w-4 h-4 ${corPrincipal}`} />
+          </div>
+          <div>
+            <p className="font-display text-lg text-white tracking-tight"
+               style={{ fontVariationSettings: '"opsz" 24, "SOFT" 30' }}>
+              {titulo} <span className="font-numeric text-sm text-slate-300/70 ml-1">{itens.length}</span>
+            </p>
+            <p className="text-slate-300/70 text-[11px] mt-0.5">{subtitulo}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-5 pb-5 border-b border-white/[0.05]">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60">Mensalidade total</p>
+          <p className={`font-display text-2xl mt-1 ${corPrincipal}`}
+             style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
+            <span className="text-slate-300/60 text-xs font-mono mr-0.5">R$</span>
+            <span className="font-numeric">{numToMask(mens)}</span>
+            <span className="text-slate-300/50 text-xs font-mono ml-1">/mês</span>
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60">Setup total</p>
+          <p className={`font-display text-2xl mt-1 ${corPrincipal}`}
+             style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
+            <span className="text-slate-300/60 text-xs font-mono mr-0.5">R$</span>
+            <span className="font-numeric">{numToMask(setup)}</span>
+          </p>
+        </div>
+      </div>
+
+      {itens.length === 0 ? (
+        <p className="text-slate-300/60 text-sm font-display italic py-4 text-center"
+           style={{ fontVariationSettings: '"opsz" 14, "SOFT" 60' }}>
+          nenhuma proposta nessa etapa.
+        </p>
+      ) : (
+        <div className="space-y-2 max-h-72 overflow-y-auto -mr-2 pr-2">
+          {itens.map(p => (
+            <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.10] transition-colors">
+              <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${corDot}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-medium truncate">{p.titulo}</p>
+                <p className="text-slate-300/70 text-[10px] mt-0.5 truncate">{p.cliente_nome}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-numeric text-emerald-300 text-xs font-medium">
+                  R$ {numToMask(Number(p.mensalidade_valor || 0))}<span className="text-slate-300/50">/{p.recorrencia === 'mensal' ? 'm' : p.recorrencia === 'anual' ? 'a' : '6m'}</span>
+                </p>
+                {Number(p.setup_valor || 0) > 0 && (
+                  <p className="font-numeric text-slate-300/70 text-[10px]">+ R$ {numToMask(Number(p.setup_valor))} setup</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

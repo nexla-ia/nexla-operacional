@@ -39,6 +39,8 @@ export default function DashboardHome() {
 
     const [
       { data: entries },
+      { data: entriesMes },
+      { data: pendentesAll },
       { data: expensesAvulsas },
       { data: expensesFixas },
       { data: projectsValor },
@@ -46,7 +48,12 @@ export default function DashboardHome() {
       { count: cProjetos },
       { count: cMens },
     ] = await Promise.all([
+      // Lista para "Movimentações recentes" — sem filtro de mês
       supabase.from('project_entries').select('valor,status,data,nome_projeto,id').order('data', { ascending: false }).limit(20),
+      // Entradas RECEBIDAS no mês corrente — entram no saldo do mês
+      supabase.from('project_entries').select('valor,data').eq('status', 'recebido').gte('data', inicioMes).lte('data', fimMes),
+      // Pendentes (a receber) — qualquer data, não entra no saldo
+      supabase.from('project_entries').select('valor').eq('status', 'pendente'),
       supabase.from('expenses').select('valor,data,descricao,id,tipo,pago').eq('tipo', 'avulsa').gte('data', inicioMes).lte('data', fimMes),
       supabase.from('expenses').select('valor,data,descricao,id,tipo,pago').eq('tipo', 'fixa'),
       supabase.from('projects').select('valor'),
@@ -56,8 +63,8 @@ export default function DashboardHome() {
     ])
 
     const expenses      = [...(expensesAvulsas ?? []), ...(expensesFixas ?? [])]
-    const entradas      = (entries  ?? []).filter(e => e.status === 'recebido').reduce((s, e) => s + (e.valor ?? 0), 0)
-    const pendentes     = (entries  ?? []).filter(e => e.status === 'pendente').reduce((s, e) => s + (e.valor ?? 0), 0)
+    const entradas      = (entriesMes    ?? []).reduce((s, e) => s + (e.valor ?? 0), 0)
+    const pendentes     = (pendentesAll  ?? []).reduce((s, e) => s + (e.valor ?? 0), 0)
     const despesas      = expenses.filter(e => e.pago).reduce((s, e) => s + (e.valor ?? 0), 0)
     const valorProjetos = (projectsValor ?? []).reduce((s, p) => s + ((p.valor as number) ?? 0), 0)
 
@@ -141,7 +148,7 @@ export default function DashboardHome() {
         {/* 3 cards menores */}
         <div className="col-span-1 lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
-            { label: 'Entradas',     sub: 'recebidas',    value: stats.entradas,  Icon: TrendingUp,   color: 'text-indigo-300', bg: 'bg-indigo-500/10', ring: 'border-indigo-500/30', glow: 'bg-indigo-400' },
+            { label: 'Entradas',     sub: `recebidas · ${MONTHS_PT[now.getMonth()].toLowerCase()}`,    value: stats.entradas,  Icon: TrendingUp,   color: 'text-indigo-300', bg: 'bg-indigo-500/10', ring: 'border-indigo-500/30', glow: 'bg-indigo-400' },
             { label: 'A receber',    sub: 'pendente',      value: stats.pendentes, Icon: Clock,        color: 'text-amber-300',  bg: 'bg-amber-500/10',  ring: 'border-amber-500/30',  glow: 'bg-amber-400' },
             { label: 'Despesas',     sub: MONTHS_PT[now.getMonth()].toLowerCase(), value: stats.despesas,  Icon: TrendingDown, color: 'text-red-300',    bg: 'bg-red-500/10',    ring: 'border-red-500/30',    glow: 'bg-red-400' },
           ].map(c => (

@@ -7,8 +7,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        sans:    ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        mono:    ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        display: ['"Fraunces"', 'ui-serif', 'Georgia', 'serif'],
       },
       animation: {
         blob: 'blob 9s infinite ease-in-out',

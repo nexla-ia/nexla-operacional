@@ -1,67 +1,66 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
-  Plus, Pencil, Trash2, X, FileText, Loader2, Calculator,
-  TrendingUp, AlertTriangle, CheckCircle2, Clock, XCircle,
-  Activity, LineChart,
+  Plus, Pencil, Trash2, X, Loader2, ArrowUpRight, ArrowDownRight,
+  CheckCircle2, Clock, XCircle, FileText,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { maskBRL, parseBRL, numToMask, formatDate, maskPhone } from '../lib/utils'
 import type { Proposal, Client } from '../lib/types'
 import { SearchableSelect } from './SearchableSelect'
 
+// ── Constantes ────────────────────────────────────────────────────────────────
+
 const EMPTY: Omit<Proposal, 'id'> = {
-  client_id: undefined,
-  cliente_nome: '',
-  cliente_telefone: '',
-  titulo: '',
-  descricao: '',
-  setup_valor: '',
-  mensalidade_valor: '',
-  recorrencia: 'mensal',
-  status: 'enviada',
-  data_envio: '',
-  observacoes: '',
+  client_id: undefined, cliente_nome: '', cliente_telefone: '',
+  titulo: '', descricao: '',
+  setup_valor: '', mensalidade_valor: '',
+  recorrencia: 'mensal', status: 'enviada',
+  data_envio: '', observacoes: '',
 }
 
-const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm
-  placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
-  focus:border-indigo-500/40 transition-all hover:border-white/20`
-const labelCls = 'block text-xs font-medium text-slate-300 mb-1.5'
+const inputCls = `w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.07] text-white text-sm
+  font-numeric placeholder-slate-500 focus:outline-none focus:border-white/20 transition-colors`
+const inputClsText = `w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.07] text-white text-sm
+  placeholder-slate-500 focus:outline-none focus:border-white/20 transition-colors`
+const labelCls = 'block text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300 mb-2'
 
-const STATUS_META: Record<Proposal['status'], { label: string; cls: string; icon: typeof Clock }> = {
-  rascunho: { label: 'Rascunho', cls: 'bg-slate-500/15 text-slate-300 ring-slate-500/25',     icon: FileText },
-  enviada:  { label: 'Enviada',  cls: 'bg-indigo-500/15 text-indigo-300 ring-indigo-500/25',  icon: Clock },
-  aceita:   { label: 'Aceita',   cls: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/25', icon: CheckCircle2 },
-  recusada: { label: 'Recusada', cls: 'bg-red-500/15 text-red-300 ring-red-500/25',           icon: XCircle },
+const STATUS_META: Record<Proposal['status'], { label: string; dot: string; tone: string }> = {
+  rascunho: { label: 'Rascunho', dot: 'bg-slate-400',   tone: 'text-slate-300'   },
+  enviada:  { label: 'Enviada',  dot: 'bg-indigo-400',  tone: 'text-indigo-200'  },
+  aceita:   { label: 'Aceita',   dot: 'bg-emerald-400', tone: 'text-emerald-200' },
+  recusada: { label: 'Recusada', dot: 'bg-rose-400',    tone: 'text-rose-200'    },
+}
+
+const STATUS_ICON: Record<Proposal['status'], typeof Clock> = {
+  rascunho: FileText, enviada: Clock, aceita: CheckCircle2, recusada: XCircle,
 }
 
 const RECORRENCIA_LABEL: Record<Proposal['recorrencia'], string> = {
-  mensal:    'Mensal',
-  semestral: 'Semestral (6 meses)',
-  anual:     'Anual',
+  mensal: 'mensal', semestral: 'semestral', anual: 'anual',
 }
 
-// Multiplicador para "valor cheio" no período (ex: anual = 12x mensalidade)
 const RECORRENCIA_MESES: Record<Proposal['recorrencia'], number> = {
-  mensal:    1,
-  semestral: 6,
-  anual:    12,
+  mensal: 1, semestral: 6, anual: 12,
 }
+
+const MES_NOME = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+// ── DB mapping ────────────────────────────────────────────────────────────────
 
 function fromDB(r: Record<string, unknown>): Proposal {
   return {
-    id:                 r.id as string,
-    client_id:          (r.client_id as string) || undefined,
-    cliente_nome:       (r.cliente_nome as string) ?? '',
-    cliente_telefone:   (r.cliente_telefone as string) ?? '',
-    titulo:             (r.titulo as string) ?? '',
-    descricao:          (r.descricao as string) ?? '',
-    setup_valor:        numToMask(r.setup_valor as number | null),
-    mensalidade_valor:  numToMask(r.mensalidade_valor as number | null),
-    recorrencia:        (r.recorrencia as Proposal['recorrencia']) ?? 'mensal',
-    status:             (r.status as Proposal['status']) ?? 'enviada',
-    data_envio:         (r.data_envio as string) ?? '',
-    observacoes:        (r.observacoes as string) ?? '',
+    id:                r.id as string,
+    client_id:         (r.client_id as string) || undefined,
+    cliente_nome:      (r.cliente_nome as string) ?? '',
+    cliente_telefone:  (r.cliente_telefone as string) ?? '',
+    titulo:            (r.titulo as string) ?? '',
+    descricao:         (r.descricao as string) ?? '',
+    setup_valor:       numToMask(r.setup_valor as number | null),
+    mensalidade_valor: numToMask(r.mensalidade_valor as number | null),
+    recorrencia:       (r.recorrencia as Proposal['recorrencia']) ?? 'mensal',
+    status:            (r.status as Proposal['status']) ?? 'enviada',
+    data_envio:        (r.data_envio as string) ?? '',
+    observacoes:       (r.observacoes as string) ?? '',
   }
 }
 
@@ -91,12 +90,8 @@ function ProposalModal({ initial, editing, clients, onSave, onClose }: {
 
   function switchMode(next: 'cliente' | 'lead') {
     setMode(next)
-    // Limpa vínculo ao trocar para "lead"
-    if (next === 'lead') {
-      setForm(f => ({ ...f, client_id: undefined }))
-    } else {
-      setForm(f => ({ ...f, client_id: undefined, cliente_nome: '', cliente_telefone: '' }))
-    }
+    if (next === 'lead') setForm(f => ({ ...f, client_id: undefined }))
+    else                 setForm(f => ({ ...f, client_id: undefined, cliente_nome: '', cliente_telefone: '' }))
   }
 
   async function submit(e: React.FormEvent) {
@@ -111,62 +106,58 @@ function ProposalModal({ initial, editing, clients, onSave, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-white/[0.09] rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up">
-        <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.07]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-indigo-500/15 ring-1 ring-indigo-500/25 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-indigo-400" />
-            </div>
-            <h2 className="text-white font-semibold text-base">
-              {editing ? 'Editar Proposta' : 'Nova Proposta'}
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+      <div className="relative w-full max-w-2xl bg-[#0a0c11] border border-white/[0.07] rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up">
+
+        <div className="flex items-center justify-between px-8 py-6 border-b border-white/[0.05]">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-indigo-300/80">
+              {editing ? 'Editar' : 'Compor'} · proposta
+            </p>
+            <h2 className="font-display text-3xl text-white tracking-tight mt-1.5" style={{ fontVariationSettings: '"opsz" 144, "SOFT" 30' }}>
+              {editing ? 'Revisar termos' : 'Nova proposta'}
             </h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.07] transition-colors">
+          <button onClick={onClose} className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/[0.05] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={submit} className="px-7 py-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* Toggle Cliente cadastrado / Lead novo */}
-          <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+        <form onSubmit={submit} className="px-8 py-7 space-y-6 max-h-[75vh] overflow-y-auto">
+          {/* Toggle */}
+          <div className="inline-flex p-0.5 rounded-full bg-white/[0.04] border border-white/[0.06]">
             {(['cliente', 'lead'] as const).map(m => (
               <button key={m} type="button" onClick={() => switchMode(m)}
-                className={`py-2 rounded-lg text-xs font-semibold transition-all
-                  ${mode === m
-                    ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/30'
-                    : 'text-slate-300 hover:text-white'}`}>
-                {m === 'cliente' ? 'Cliente cadastrado' : 'Lead / sem cadastro'}
+                className={`px-4 py-1.5 rounded-full text-[11px] font-medium tracking-wide transition-all
+                  ${mode === m ? 'bg-white text-slate-900' : 'text-slate-300 hover:text-white'}`}>
+                {m === 'cliente' ? 'Cliente cadastrado' : 'Lead novo'}
               </button>
             ))}
           </div>
 
           {mode === 'cliente' ? (
             <div>
-              <label className={labelCls}>Cliente *</label>
+              <label className={labelCls}>Cliente</label>
               {clients.length === 0 ? (
-                <div className="w-full px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
-                  Nenhum cliente cadastrado. Use o modo "Lead / sem cadastro".
+                <div className="px-4 py-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/15 text-amber-200/80 text-sm">
+                  Nenhum cliente cadastrado. Use o modo "Lead novo".
                 </div>
               ) : (
-                <SearchableSelect
-                  required
-                  value={form.client_id ?? ''}
-                  onChange={handleClient}
+                <SearchableSelect required value={form.client_id ?? ''} onChange={handleClient}
                   placeholder="Selecione um cliente…"
                   options={clients.map(c => ({ value: c.id, label: c.nome, sublabel: c.cpf_cnpj || c.telefone || undefined }))}
                 />
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className={labelCls}>Nome do Lead *</label>
-                <input className={inputCls} placeholder="Ex: João Silva" required
+                <label className={labelCls}>Nome do lead</label>
+                <input className={inputClsText} placeholder="Ex: João Silva" required
                   value={form.cliente_nome} onChange={e => set('cliente_nome', e.target.value)} />
               </div>
               <div>
-                <label className={labelCls}>Telefone / WhatsApp</label>
+                <label className={labelCls}>Telefone</label>
                 <input className={inputCls} placeholder="(00) 00000-0000" inputMode="tel"
                   value={form.cliente_telefone}
                   onChange={e => set('cliente_telefone', maskPhone(e.target.value))} />
@@ -174,100 +165,89 @@ function ProposalModal({ initial, editing, clients, onSave, onClose }: {
             </div>
           )}
 
-          {/* Título */}
           <div>
-            <label className={labelCls}>Título da Proposta *</label>
-            <input className={inputCls} placeholder="Ex: Atendimento + Site institucional"
-              value={form.titulo} onChange={e => set('titulo', e.target.value)} required />
+            <label className={labelCls}>Título da proposta</label>
+            <input className={inputClsText} placeholder="Ex: Atendimento + Site institucional" required
+              value={form.titulo} onChange={e => set('titulo', e.target.value)} />
           </div>
 
-          {/* Setup | Mensalidade */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className={labelCls}>Valor de Setup (R$)</label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm">R$</span>
-                <input className={inputCls + ' pl-9'} placeholder="0,00" inputMode="numeric"
-                  value={form.setup_valor} onChange={e => set('setup_valor', maskBRL(e.target.value))} />
-              </div>
+              <label className={labelCls}>Setup (R$)</label>
+              <input className={inputCls} placeholder="0,00" inputMode="numeric"
+                value={form.setup_valor} onChange={e => set('setup_valor', maskBRL(e.target.value))} />
             </div>
             <div>
               <label className={labelCls}>Mensalidade (R$)</label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm">R$</span>
-                <input className={inputCls + ' pl-9'} placeholder="0,00" inputMode="numeric"
-                  value={form.mensalidade_valor} onChange={e => set('mensalidade_valor', maskBRL(e.target.value))} />
-              </div>
+              <input className={inputCls} placeholder="0,00" inputMode="numeric"
+                value={form.mensalidade_valor} onChange={e => set('mensalidade_valor', maskBRL(e.target.value))} />
             </div>
           </div>
 
-          {/* Recorrência | Data envio */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className={labelCls}>Recorrência</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex gap-1 p-0.5 rounded-full bg-white/[0.04] border border-white/[0.06]">
                 {(['mensal','semestral','anual'] as const).map(r => (
                   <button key={r} type="button" onClick={() => set('recorrencia', r)}
-                    className={`py-2 rounded-xl text-xs font-semibold border transition-all
-                      ${form.recorrencia === r
-                        ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
-                        : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'}`}>
+                    className={`flex-1 py-2 rounded-full text-[11px] font-medium transition-all
+                      ${form.recorrencia === r ? 'bg-white text-slate-900' : 'text-slate-300 hover:text-white'}`}>
                     {r === 'mensal' ? 'Mensal' : r === 'semestral' ? '6 meses' : 'Anual'}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className={labelCls}>Data de Envio</label>
+              <label className={labelCls}>Data de envio</label>
               <input type="date" className={inputCls + ' cursor-pointer'} style={{ colorScheme: 'dark' }}
                 value={form.data_envio} onChange={e => set('data_envio', e.target.value)} />
             </div>
           </div>
 
-          {/* Status */}
           <div>
             <label className={labelCls}>Status</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(Object.keys(STATUS_META) as Proposal['status'][]).map(s => {
-                const meta = STATUS_META[s]
+                const m = STATUS_META[s]
                 const active = form.status === s
                 return (
                   <button key={s} type="button" onClick={() => set('status', s)}
-                    className={`py-2 rounded-xl text-xs font-semibold border transition-all
-                      ${active ? meta.cls + ' ring-1' : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'}`}>
-                    {meta.label}
+                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-medium transition-all
+                      ${active
+                        ? 'bg-white/[0.06] border border-white/15 text-white'
+                        : 'bg-white/[0.02] border border-white/[0.05] text-slate-300 hover:border-white/15'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                    {m.label}
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Descrição */}
           <div>
             <label className={labelCls}>Descrição</label>
-            <textarea rows={2} className={inputCls + ' resize-none'} placeholder="O que está incluso na proposta…"
+            <textarea rows={2} className={inputClsText + ' resize-none'} placeholder="O que está incluso na proposta…"
               value={form.descricao} onChange={e => set('descricao', e.target.value)} />
           </div>
 
-          {/* Observações */}
           <div>
             <label className={labelCls}>Observações internas</label>
-            <textarea rows={2} className={inputCls + ' resize-none'} placeholder="Notas internas, prazos, condições…"
+            <textarea rows={2} className={inputClsText + ' resize-none'} placeholder="Notas, prazos, condições…"
               value={form.observacoes} onChange={e => set('observacoes', e.target.value)} />
           </div>
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-3 pt-2">
             <button type="submit"
               disabled={saving || (mode === 'cliente' ? !form.client_id : !form.cliente_nome.trim())}
-              className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer
-                         shadow-lg shadow-indigo-500/25 disabled:opacity-60 disabled:cursor-not-allowed
-                         hover:-translate-y-0.5 transition-all duration-300">
+              className="flex-1 py-3 rounded-full text-slate-900 text-sm font-semibold bg-white
+                         hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed
+                         transition-colors">
               {saving
-                ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Salvando…</span>
-                : editing ? 'Salvar' : 'Criar Proposta'}
+                ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Salvando</span>
+                : editing ? 'Salvar alterações' : 'Criar proposta'}
             </button>
             <button type="button" onClick={onClose} disabled={saving}
-              className="px-5 py-2.5 rounded-xl text-slate-300 text-sm bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.07] transition-colors">
+              className="px-6 py-3 rounded-full text-slate-300 text-sm font-medium bg-transparent border border-white/[0.08] hover:border-white/20 transition-colors">
               Cancelar
             </button>
           </div>
@@ -277,7 +257,7 @@ function ProposalModal({ initial, editing, clients, onSave, onClose }: {
   )
 }
 
-// ── Saúde Financeira do Mês Atual ─────────────────────────────────────────────
+// ── Saúde do mês (hero saldo + KPIs) ──────────────────────────────────────────
 
 function SaudeMes({ receitaRecorrente, entradasMes, custoFixo, despesasMes, qtdMensalidadesAtivas }: {
   receitaRecorrente: number
@@ -291,54 +271,117 @@ function SaudeMes({ receitaRecorrente, entradasMes, custoFixo, despesasMes, qtdM
   const saldo        = receitaTotal - despesaTotal
   const margemPct    = despesaTotal > 0 ? (saldo / despesaTotal) * 100 : 0
   const ticketMedio  = qtdMensalidadesAtivas > 0 ? receitaRecorrente / qtdMensalidadesAtivas : 0
+  const positivo     = saldo >= 0
+
+  const hoje    = new Date()
+  const mesNome = MES_NOME[hoje.getMonth()].toLowerCase()
 
   return (
-    <div className="rounded-3xl bg-slate-900/70 border border-white/[0.07] p-6 mb-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className={`w-9 h-9 rounded-xl ring-1 flex items-center justify-center
-          ${saldo >= 0 ? 'bg-emerald-500/15 ring-emerald-500/25' : 'bg-red-500/15 ring-red-500/25'}`}>
-          <Activity className={`w-4 h-4 ${saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
+    <section className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white/[0.06] border border-white/[0.06] rounded-3xl overflow-hidden mb-12">
+
+      {/* Hero saldo */}
+      <div className="lg:col-span-7 bg-[#0a0c11] p-10 sm:p-12 relative overflow-hidden">
+        {/* Subtle radial light */}
+        <div className={`absolute -top-32 -right-24 w-[420px] h-[420px] rounded-full blur-3xl pointer-events-none
+          ${positivo ? 'bg-emerald-500/[0.08]' : 'bg-rose-500/[0.08]'}`} />
+
+        <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-300/70">
+          Saldo líquido · {mesNome}
+        </p>
+
+        <div className="mt-7 flex items-baseline gap-3 relative">
+          <span className={`text-3xl font-display ${positivo ? 'text-emerald-300' : 'text-rose-300'}`}
+                style={{ fontVariationSettings: '"opsz" 144, "SOFT" 60' }}>
+            {positivo ? '+' : '−'}
+          </span>
+          <span className="text-slate-300 text-2xl font-mono mr-1">R$</span>
+          <span className={`font-display tracking-tight leading-none ${positivo ? 'text-white' : 'text-rose-50'}`}
+                style={{
+                  fontVariationSettings: '"opsz" 144, "SOFT" 30',
+                  fontSize: 'clamp(56px, 8vw, 104px)',
+                  fontWeight: 400,
+                }}>
+            {numToMask(Math.abs(saldo))}
+          </span>
         </div>
-        <div>
-          <h3 className="text-white font-semibold text-sm">Saúde do mês atual</h3>
-          <p className="text-slate-300 text-xs mt-0.5">Receita real + entradas recebidas vs despesas</p>
+
+        <div className="mt-8 flex items-center gap-3">
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono
+            ${positivo
+              ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20'
+              : 'bg-rose-500/10 text-rose-300 ring-1 ring-rose-500/20'}`}>
+            {positivo
+              ? <ArrowUpRight className="w-3 h-3" />
+              : <ArrowDownRight className="w-3 h-3" />}
+            {margemPct >= 0 ? '+' : ''}{margemPct.toFixed(1)}% sobre despesa
+          </span>
+          <span className="text-slate-300 text-xs">
+            ticket médio <span className="font-numeric text-white">R$ {numToMask(ticketMedio)}</span>
+          </span>
         </div>
-        <div className={`ml-auto text-right ${saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-          <p className="text-[10px] uppercase tracking-wider opacity-80">Saldo</p>
-          <p className="font-bold text-lg leading-none">
-            {saldo >= 0 ? '+' : '−'} R$ {numToMask(Math.abs(saldo))}
-          </p>
-          <p className="text-[10px] opacity-80 mt-0.5">{margemPct >= 0 ? '+' : ''}{margemPct.toFixed(0)}% sobre despesa</p>
-        </div>
+
+        <p className="mt-10 text-slate-300 text-sm font-display italic max-w-md leading-relaxed"
+           style={{ fontVariationSettings: '"opsz" 14, "SOFT" 50' }}>
+          {positivo
+            ? `Você está cobrindo as despesas com ${qtdMensalidadesAtivas} ${qtdMensalidadesAtivas === 1 ? 'cliente pagante' : 'clientes pagantes'}. Tudo certo para crescer.`
+            : `Faltam R$ ${numToMask(Math.abs(saldo))} para fechar o mês no zero. Precisa de propostas novas.`}
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/15 px-4 py-3">
-          <p className="text-emerald-300/90 text-[10px] uppercase tracking-wider">Mensalidades ativas</p>
-          <p className="text-emerald-400 font-semibold text-base mt-1">R$ {numToMask(receitaRecorrente)}</p>
-          <p className="text-slate-300 text-[11px] mt-0.5">{qtdMensalidadesAtivas} cliente{qtdMensalidadesAtivas === 1 ? '' : 's'} · ticket R$ {numToMask(ticketMedio)}</p>
-        </div>
-        <div className="rounded-2xl bg-emerald-500/[0.06] border border-emerald-500/15 px-4 py-3">
-          <p className="text-emerald-300/90 text-[10px] uppercase tracking-wider">Entradas (mês)</p>
-          <p className="text-emerald-400 font-semibold text-base mt-1">R$ {numToMask(entradasMes)}</p>
-          <p className="text-slate-300 text-[11px] mt-0.5">setups e projetos recebidos</p>
-        </div>
-        <div className="rounded-2xl bg-red-500/[0.06] border border-red-500/15 px-4 py-3">
-          <p className="text-red-300/90 text-[10px] uppercase tracking-wider">Despesas fixas</p>
-          <p className="text-red-400 font-semibold text-base mt-1">R$ {numToMask(custoFixo)}</p>
-          <p className="text-slate-300 text-[11px] mt-0.5">recorrentes / mês</p>
-        </div>
-        <div className="rounded-2xl bg-red-500/[0.06] border border-red-500/15 px-4 py-3">
-          <p className="text-red-300/90 text-[10px] uppercase tracking-wider">Despesas avulsas</p>
-          <p className="text-red-400 font-semibold text-base mt-1">R$ {numToMask(despesasMes)}</p>
-          <p className="text-slate-300 text-[11px] mt-0.5">no mês corrente</p>
-        </div>
+      {/* KPIs */}
+      <div className="lg:col-span-5 bg-[#0a0c11] grid grid-cols-2 grid-rows-2 gap-px bg-white/[0.06]">
+        <KPI
+          kicker="Recorrente"
+          value={receitaRecorrente}
+          tone="emerald"
+          sub={`${qtdMensalidadesAtivas} mensalidade${qtdMensalidadesAtivas === 1 ? '' : 's'} ativa${qtdMensalidadesAtivas === 1 ? '' : 's'}`}
+        />
+        <KPI
+          kicker="Entradas no mês"
+          value={entradasMes}
+          tone="emerald"
+          sub="setups e projetos"
+        />
+        <KPI
+          kicker="Despesa fixa"
+          value={custoFixo}
+          tone="rose"
+          sub="recorrente / mês"
+        />
+        <KPI
+          kicker="Avulsas no mês"
+          value={despesasMes}
+          tone="rose"
+          sub="pontuais"
+        />
+      </div>
+    </section>
+  )
+}
+
+function KPI({ kicker, value, tone, sub }: {
+  kicker: string
+  value: number
+  tone: 'emerald' | 'rose'
+  sub: string
+}) {
+  const color = tone === 'emerald' ? 'text-emerald-200' : 'text-rose-200'
+  return (
+    <div className="bg-[#0a0c11] p-6 sm:p-7 flex flex-col justify-between">
+      <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-300/70">{kicker}</p>
+      <div className="mt-6">
+        <p className={`font-display text-3xl tracking-tight ${color}`}
+           style={{ fontVariationSettings: '"opsz" 48, "SOFT" 40' }}>
+          <span className="text-slate-300/60 text-base font-mono mr-1">R$</span>
+          <span className="font-numeric">{numToMask(value)}</span>
+        </p>
+        <p className="text-slate-300 text-xs mt-2">{sub}</p>
       </div>
     </div>
   )
 }
 
-// ── Gráfico de Projeção 12 meses ──────────────────────────────────────────────
+// ── Projeção 12 meses ─────────────────────────────────────────────────────────
 
 function ProjecaoChart({ receitaRecorrente, custoFixo, mensalidadeAceitas, mensalidadeEnviadas, setupAceitas, setupEnviadas }: {
   receitaRecorrente: number
@@ -348,39 +391,33 @@ function ProjecaoChart({ receitaRecorrente, custoFixo, mensalidadeAceitas, mensa
   setupAceitas: number
   setupEnviadas: number
 }) {
-  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
   const hoje  = new Date()
   const labels: string[] = []
   for (let i = 0; i < 12; i++) {
     const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1)
-    labels.push(meses[d.getMonth()] + (d.getMonth() === 0 || i === 0 ? `/${String(d.getFullYear()).slice(2)}` : ''))
+    labels.push(meses[d.getMonth()])
   }
 
-  // Por mês: receita atual + (no mês 0, soma o setup das aceitas/enviadas como receita única)
-  const data = labels.map((_, i) => {
-    const setupExtra = i === 0 ? setupAceitas : 0
-    const setupOpt   = i === 0 ? setupEnviadas : 0
-    return {
-      atual:    receitaRecorrente,
-      aceitas:  mensalidadeAceitas + setupExtra,
-      enviadas: mensalidadeEnviadas + setupOpt,
-      custo:    custoFixo,
-    }
-  })
+  const data = labels.map((_, i) => ({
+    atual:    receitaRecorrente,
+    aceitas:  mensalidadeAceitas + (i === 0 ? setupAceitas : 0),
+    enviadas: mensalidadeEnviadas + (i === 0 ? setupEnviadas : 0),
+    custo:    custoFixo,
+  }))
 
   const totaisOtimista = data.map(d => d.atual + d.aceitas + d.enviadas)
-  const maxValor = Math.max(custoFixo, ...totaisOtimista, 1) * 1.15
+  const maxValor = Math.max(custoFixo, ...totaisOtimista, 1) * 1.18
 
-  // Dimensões SVG
-  const W = 720, H = 240, padL = 50, padR = 12, padT = 16, padB = 28
+  // SVG dimensions
+  const W = 880, H = 320, padL = 56, padR = 16, padT = 24, padB = 36
   const innerW = W - padL - padR
   const innerH = H - padT - padB
-  const barW   = innerW / 12 * 0.7
   const step   = innerW / 12
+  const barW   = step * 0.55
 
   const yOf = (v: number) => padT + innerH - (v / maxValor) * innerH
 
-  // Saldo cumulativo no cenário "com aceitas"
   let acum = 0
   const saldoPath = data.map((d, i) => {
     acum += (d.atual + d.aceitas) - d.custo
@@ -388,45 +425,70 @@ function ProjecaoChart({ receitaRecorrente, custoFixo, mensalidadeAceitas, mensa
   })
   const saldoMaxAbs = Math.max(...saldoPath.map(p => Math.abs(p.valor)), 1)
   const saldoYBase  = padT + innerH / 2
-  const saldoYOf    = (v: number) => saldoYBase - (v / saldoMaxAbs) * (innerH / 2 - 8)
+  const saldoYOf    = (v: number) => saldoYBase - (v / saldoMaxAbs) * (innerH / 2 - 12)
 
-  // Y ticks
   const ticks = [0, maxValor * 0.25, maxValor * 0.5, maxValor * 0.75, maxValor]
 
+  // Resumos
+  const saldo12mAtual    = (receitaRecorrente - custoFixo) * 12
+  const saldo12mAceitas  = (receitaRecorrente + mensalidadeAceitas - custoFixo) * 12 + setupAceitas
+  const saldo12mOtimista = (receitaRecorrente + mensalidadeAceitas + mensalidadeEnviadas - custoFixo) * 12 + setupAceitas + setupEnviadas
+
   return (
-    <div className="rounded-3xl bg-slate-900/70 border border-white/[0.07] p-6 mb-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-xl bg-violet-500/15 ring-1 ring-violet-500/25 flex items-center justify-center">
-          <LineChart className="w-4 h-4 text-violet-400" />
-        </div>
+    <section className="bg-[#0a0c11] border border-white/[0.06] rounded-3xl p-8 sm:p-10 mb-12">
+      <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
         <div>
-          <h3 className="text-white font-semibold text-sm">Projeção 12 meses</h3>
-          <p className="text-slate-300 text-xs mt-0.5">Receita projetada considerando propostas aceitas e enviadas</p>
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-300/70">
+            Trajetória · próximos doze meses
+          </p>
+          <h3 className="font-display text-3xl text-white tracking-tight mt-1.5"
+              style={{ fontVariationSettings: '"opsz" 96, "SOFT" 30' }}>
+            Projeção <span className="italic text-slate-300/80" style={{ fontVariationSettings: '"opsz" 96, "SOFT" 80' }}>financeira</span>
+          </h3>
+        </div>
+        <div className="flex items-center gap-5 text-[11px] text-slate-300 font-mono uppercase tracking-wider">
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-emerald-400/80" />base</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-emerald-400/35" />aceitas</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-amber-300/40" />enviadas</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-rose-400/80" />custo</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-0.5 bg-indigo-300" />saldo acum.</span>
         </div>
       </div>
 
-      {/* Legenda */}
-      <div className="flex flex-wrap gap-4 mb-3 text-[11px] text-slate-300">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500/80"></span>Receita atual</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400/50"></span>+ Propostas aceitas</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400/50"></span>+ Enviadas (otimista)</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-red-400"></span>Custo fixo</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-indigo-400"></span>Saldo acumulado</span>
-      </div>
-
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto -mx-1">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
-          {/* Grid */}
+          <defs>
+            <linearGradient id="grAtual" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"  stopColor="rgb(52,211,153)" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="rgb(16,185,129)" stopOpacity="0.7" />
+            </linearGradient>
+            <linearGradient id="grAceitas" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"  stopColor="rgb(110,231,183)" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="rgb(52,211,153)" stopOpacity="0.25" />
+            </linearGradient>
+            <linearGradient id="grEnviadas" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"  stopColor="rgb(252,211,77)" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="rgb(245,158,11)" stopOpacity="0.25" />
+            </linearGradient>
+            <linearGradient id="grSaldo" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"  stopColor="rgb(165,180,252)" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="rgb(99,102,241)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid horizontal */}
           {ticks.map((t, i) => (
             <g key={i}>
-              <line x1={padL} y1={yOf(t)} x2={W - padR} y2={yOf(t)} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-              <text x={padL - 6} y={yOf(t) + 3} fill="rgba(203,213,225,0.6)" fontSize="9" textAnchor="end">
+              <line x1={padL} y1={yOf(t)} x2={W - padR} y2={yOf(t)}
+                stroke="rgba(255,255,255,0.045)" />
+              <text x={padL - 10} y={yOf(t) + 3.5} fill="rgba(203,213,225,0.45)"
+                fontSize="9" fontFamily="JetBrains Mono" textAnchor="end">
                 {t >= 1000 ? `${(t/1000).toFixed(1)}k` : t.toFixed(0)}
               </text>
             </g>
           ))}
 
-          {/* Barras stacked */}
+          {/* Barras */}
           {data.map((d, i) => {
             const x = padL + step * i + (step - barW) / 2
             const yAtual    = yOf(d.atual)
@@ -437,67 +499,96 @@ function ProjecaoChart({ receitaRecorrente, custoFixo, mensalidadeAceitas, mensa
             const hEnviadas = yAceitas - yEnviadas
             return (
               <g key={i}>
-                {hAtual    > 0 && <rect x={x} y={yAtual}    width={barW} height={hAtual}    fill="rgba(16,185,129,0.8)"  rx="2" />}
-                {hAceitas  > 0 && <rect x={x} y={yAceitas}  width={barW} height={hAceitas}  fill="rgba(52,211,153,0.5)"  rx="2" />}
-                {hEnviadas > 0 && <rect x={x} y={yEnviadas} width={barW} height={hEnviadas} fill="rgba(251,191,36,0.5)"  rx="2" />}
+                {hAtual    > 0.5 && <rect x={x} y={yAtual}    width={barW} height={hAtual}    fill="url(#grAtual)"    rx="3" />}
+                {hAceitas  > 0.5 && <rect x={x} y={yAceitas}  width={barW} height={hAceitas}  fill="url(#grAceitas)"  rx="3" />}
+                {hEnviadas > 0.5 && <rect x={x} y={yEnviadas} width={barW} height={hEnviadas} fill="url(#grEnviadas)" rx="3" />}
               </g>
             )
           })}
 
           {/* Linha custo fixo */}
           {custoFixo > 0 && (
-            <line
-              x1={padL} y1={yOf(custoFixo)}
-              x2={W - padR} y2={yOf(custoFixo)}
-              stroke="rgba(248,113,113,0.9)" strokeWidth="1.5" strokeDasharray="4 3"
-            />
+            <>
+              <line
+                x1={padL} y1={yOf(custoFixo)}
+                x2={W - padR} y2={yOf(custoFixo)}
+                stroke="rgba(251,113,133,0.85)" strokeWidth="1.5" strokeDasharray="5 4"
+              />
+              <text x={W - padR - 4} y={yOf(custoFixo) - 6}
+                fill="rgba(253,164,175,0.85)" fontSize="9" fontFamily="JetBrains Mono"
+                textAnchor="end">
+                custo {custoFixo >= 1000 ? `${(custoFixo/1000).toFixed(1)}k` : custoFixo.toFixed(0)}
+              </text>
+            </>
           )}
 
-          {/* Linha saldo acumulado (cenário com aceitas) */}
+          {/* Saldo acumulado: area + line */}
+          <path
+            fill="url(#grSaldo)"
+            d={`M ${saldoPath[0].x},${saldoYBase}
+                ${saldoPath.map(p => `L ${p.x},${saldoYOf(p.valor)}`).join(' ')}
+                L ${saldoPath[saldoPath.length - 1].x},${saldoYBase} Z`}
+          />
           <polyline
             fill="none"
-            stroke="rgba(129,140,248,0.95)"
-            strokeWidth="1.8"
+            stroke="rgb(165,180,252)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
             points={saldoPath.map(p => `${p.x},${saldoYOf(p.valor)}`).join(' ')}
           />
           {saldoPath.map((p, i) => (
-            <circle key={i} cx={p.x} cy={saldoYOf(p.valor)} r="2.5" fill="rgb(129,140,248)" />
+            <circle key={i} cx={p.x} cy={saldoYOf(p.valor)} r="2.5"
+              fill="#0a0c11" stroke="rgb(165,180,252)" strokeWidth="1.5" />
           ))}
 
           {/* Eixo X */}
           {labels.map((l, i) => (
-            <text key={i} x={padL + step * i + step / 2} y={H - 10}
-              fill="rgba(203,213,225,0.7)" fontSize="9" textAnchor="middle">{l}</text>
+            <text key={i} x={padL + step * i + step / 2} y={H - 12}
+              fill={i === 0 ? 'rgba(255,255,255,0.85)' : 'rgba(203,213,225,0.55)'}
+              fontSize="9" fontFamily="JetBrains Mono" textAnchor="middle"
+              letterSpacing="1.5">
+              {l.toUpperCase()}
+            </text>
           ))}
         </svg>
       </div>
 
-      {/* Resumo do cenário */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] px-4 py-3">
-          <p className="text-slate-300 text-[10px] uppercase tracking-wider">Saldo 12m · cenário atual</p>
-          <p className={`font-semibold text-base mt-1 ${(receitaRecorrente - custoFixo) * 12 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            R$ {numToMask((receitaRecorrente - custoFixo) * 12)}
-          </p>
-        </div>
-        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] px-4 py-3">
-          <p className="text-slate-300 text-[10px] uppercase tracking-wider">Com propostas aceitas</p>
-          <p className={`font-semibold text-base mt-1 ${((receitaRecorrente + mensalidadeAceitas - custoFixo) * 12 + setupAceitas) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            R$ {numToMask((receitaRecorrente + mensalidadeAceitas - custoFixo) * 12 + setupAceitas)}
-          </p>
-        </div>
-        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] px-4 py-3">
-          <p className="text-slate-300 text-[10px] uppercase tracking-wider">Otimista (todas aceitas)</p>
-          <p className={`font-semibold text-base mt-1 ${((receitaRecorrente + mensalidadeAceitas + mensalidadeEnviadas - custoFixo) * 12 + setupAceitas + setupEnviadas) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            R$ {numToMask((receitaRecorrente + mensalidadeAceitas + mensalidadeEnviadas - custoFixo) * 12 + setupAceitas + setupEnviadas)}
-          </p>
-        </div>
+      {/* Cenários */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/[0.06] border border-white/[0.06] rounded-2xl overflow-hidden mt-8">
+        <ScenarioCell kicker="Cenário base" value={saldo12mAtual} hint="só com receita atual" />
+        <ScenarioCell kicker="Com aceitas" value={saldo12mAceitas} hint="propostas já fechadas" highlight />
+        <ScenarioCell kicker="Otimista" value={saldo12mOtimista} hint="se todas as enviadas fecharem" />
       </div>
+    </section>
+  )
+}
+
+function ScenarioCell({ kicker, value, hint, highlight }: {
+  kicker: string
+  value: number
+  hint: string
+  highlight?: boolean
+}) {
+  const positivo = value >= 0
+  return (
+    <div className={`bg-[#0a0c11] p-6 ${highlight ? 'ring-1 ring-inset ring-indigo-400/20' : ''}`}>
+      <div className="flex items-center gap-2">
+        <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-300/70">{kicker}</p>
+        {highlight && <span className="text-[9px] font-mono uppercase tracking-widest text-indigo-300">primário</span>}
+      </div>
+      <p className={`mt-3 font-display text-2xl tracking-tight ${positivo ? 'text-white' : 'text-rose-200'}`}
+         style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
+        <span className="text-slate-300/60 text-sm font-mono mr-1">R$</span>
+        <span className="font-numeric">{numToMask(value)}</span>
+        <span className="text-slate-300/50 text-xs font-mono ml-2">/12m</span>
+      </p>
+      <p className="text-slate-300 text-xs mt-1.5">{hint}</p>
     </div>
   )
 }
 
-// ── Calculadora de valor ideal ────────────────────────────────────────────────
+// ── Calculadora ───────────────────────────────────────────────────────────────
 
 function Calculadora({ custoFixoMensal, receitaRecorrente, qtdClientesAtivos }: {
   custoFixoMensal: number
@@ -508,109 +599,112 @@ function Calculadora({ custoFixoMensal, receitaRecorrente, qtdClientesAtivos }: 
   const [novosClientes, setNovos] = useState('5')
   const [setupMult, setSetupMult] = useState('1.5')
 
-  const margemNum   = parseFloat(margem) || 0
-  const novosNum    = Math.max(1, parseInt(novosClientes) || 1)
-  const setupNum    = parseFloat(setupMult) || 0
+  const margemNum = parseFloat(margem) || 0
+  const novosNum  = Math.max(1, parseInt(novosClientes) || 1)
+  const setupNum  = parseFloat(setupMult) || 0
 
   const custoComMargem   = custoFixoMensal * (1 + margemNum / 100)
   const faltaCobrir      = Math.max(0, custoComMargem - receitaRecorrente)
   const mensalidadeIdeal = faltaCobrir / novosNum
   const minimo           = Math.max(0, (custoFixoMensal - receitaRecorrente) / novosNum)
   const setupIdeal       = mensalidadeIdeal * setupNum
-  const saldo            = receitaRecorrente - custoFixoMensal
 
   return (
-    <div className="rounded-3xl bg-slate-900/70 border border-white/[0.07] p-6 mb-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/25 flex items-center justify-center">
-          <Calculator className="w-4 h-4 text-emerald-400" />
-        </div>
-        <div>
-          <h3 className="text-white font-semibold text-sm">Calculadora de valor ideal</h3>
-          <p className="text-slate-300 text-xs mt-0.5">
-            Você já tem <span className="text-emerald-300 font-semibold">{qtdClientesAtivos}</span> cliente{qtdClientesAtivos === 1 ? '' : 's'} pagando.
-            Quanto cobrar pelos próximos?
+    <section className="bg-[#0a0c11] border border-white/[0.06] rounded-3xl overflow-hidden mb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white/[0.06]">
+
+        {/* Pergunta + inputs */}
+        <div className="lg:col-span-5 bg-[#0a0c11] p-8 sm:p-10">
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-300/70">
+            Calculadora · valor ideal
           </p>
-        </div>
-      </div>
-
-      {/* Snapshot atual */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] px-4 py-3">
-          <p className="text-slate-300 text-[11px] uppercase tracking-wider">Custo fixo / mês</p>
-          <p className="text-red-400 font-semibold text-base mt-1">R$ {numToMask(custoFixoMensal)}</p>
-        </div>
-        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] px-4 py-3">
-          <p className="text-slate-300 text-[11px] uppercase tracking-wider">Receita recorrente</p>
-          <p className="text-emerald-400 font-semibold text-base mt-1">R$ {numToMask(receitaRecorrente)}</p>
-        </div>
-        <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] px-4 py-3">
-          <p className="text-slate-300 text-[11px] uppercase tracking-wider">Saldo mensal</p>
-          <p className={`font-semibold text-base mt-1 ${saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {saldo >= 0 ? '+' : '-'} R$ {numToMask(Math.abs(saldo))}
+          <h3 className="font-display text-3xl text-white tracking-tight mt-1.5 leading-tight"
+              style={{ fontVariationSettings: '"opsz" 96, "SOFT" 30' }}>
+            Quanto cobrar
+            <span className="italic text-slate-300/80 block" style={{ fontVariationSettings: '"opsz" 96, "SOFT" 80' }}>
+              do próximo cliente?
+            </span>
+          </h3>
+          <p className="text-slate-300 text-sm mt-4 leading-relaxed max-w-md">
+            Com <span className="text-emerald-300 font-numeric">{qtdClientesAtivos}</span> {qtdClientesAtivos === 1 ? 'cliente pagante' : 'clientes pagando'} hoje, ajuste os parâmetros abaixo e veja o ticket que cobre o custo + margem.
           </p>
+
+          <div className="space-y-5 mt-8">
+            <div>
+              <label className={labelCls}>Margem desejada · %</label>
+              <input type="number" min={0} max={500} className={inputCls}
+                value={margem} onChange={e => setMargem(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelCls}>Novos clientes a fechar</label>
+              <input type="number" min={1} className={inputCls}
+                value={novosClientes} onChange={e => setNovos(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelCls}>Setup = × mensalidade</label>
+              <input type="number" min={0} step={0.1} className={inputCls}
+                value={setupMult} onChange={e => setSetupMult(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* Resultados */}
+        <div className="lg:col-span-7 bg-[#0a0c11] grid grid-rows-3 gap-px bg-white/[0.06]">
+          <ResultRow
+            kicker="Mensalidade ideal"
+            value={mensalidadeIdeal}
+            note={`por cliente / mês · margem ${margemNum}%`}
+            tone="primary"
+          />
+          <ResultRow
+            kicker="Setup sugerido"
+            value={setupIdeal}
+            note={`${setupNum}× mensalidade · cobrança única`}
+            tone="emerald"
+          />
+          <ResultRow
+            kicker="Mínimo p/ não dar prejuízo"
+            value={minimo}
+            note="margem 0% · só para cobrir custo"
+            tone="amber"
+          />
         </div>
       </div>
+    </section>
+  )
+}
 
-      {/* Inputs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-        <div>
-          <label className={labelCls}>Margem desejada (%)</label>
-          <input type="number" min={0} max={500} className={inputCls}
-            value={margem} onChange={e => setMargem(e.target.value)} />
-        </div>
-        <div>
-          <label className={labelCls}>Novos clientes a fechar</label>
-          <input type="number" min={1} className={inputCls}
-            value={novosClientes} onChange={e => setNovos(e.target.value)} />
-        </div>
-        <div>
-          <label className={labelCls}>Setup = ×Mensalidade</label>
-          <input type="number" min={0} step={0.1} className={inputCls}
-            value={setupMult} onChange={e => setSetupMult(e.target.value)} />
-        </div>
+function ResultRow({ kicker, value, note, tone }: {
+  kicker: string
+  value: number
+  note: string
+  tone: 'primary' | 'emerald' | 'amber'
+}) {
+  const dot =
+    tone === 'primary' ? 'bg-indigo-300' :
+    tone === 'emerald' ? 'bg-emerald-300' :
+                         'bg-amber-300'
+  return (
+    <div className="bg-[#0a0c11] p-7 sm:p-9 flex items-center gap-6">
+      <div className="flex-shrink-0 flex items-center gap-3">
+        <span className={`w-1 h-12 rounded-full ${dot}`} />
       </div>
-
-      {/* Resultados */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-gradient-to-br from-indigo-500/15 to-violet-500/10 border border-indigo-500/20 px-4 py-4">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="w-3.5 h-3.5 text-indigo-300" />
-            <p className="text-indigo-300 text-[11px] uppercase tracking-wider font-semibold">Mensalidade ideal</p>
-          </div>
-          <p className="text-white font-bold text-xl mt-1">R$ {numToMask(mensalidadeIdeal)}</p>
-          <p className="text-slate-300 text-[11px] mt-1">por cliente / mês ({margemNum}% margem)</p>
-        </div>
-
-        <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-4">
-          <div className="flex items-center gap-2 mb-1">
-            <FileText className="w-3.5 h-3.5 text-emerald-300" />
-            <p className="text-emerald-300 text-[11px] uppercase tracking-wider font-semibold">Setup sugerido</p>
-          </div>
-          <p className="text-white font-bold text-xl mt-1">R$ {numToMask(setupIdeal)}</p>
-          <p className="text-slate-300 text-[11px] mt-1">{setupNum}× mensalidade</p>
-        </div>
-
-        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-4">
-          <div className="flex items-center gap-2 mb-1">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
-            <p className="text-amber-300 text-[11px] uppercase tracking-wider font-semibold">Mínimo p/ não dar prejuízo</p>
-          </div>
-          <p className="text-white font-bold text-xl mt-1">R$ {numToMask(minimo)}</p>
-          <p className="text-slate-300 text-[11px] mt-1">por cliente / mês (margem 0%)</p>
-        </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-300/70">{kicker}</p>
+        <p className="text-slate-300 text-xs mt-0.5">{note}</p>
       </div>
-
-      {custoFixoMensal === 0 && (
-        <p className="text-slate-300 text-xs mt-4 italic">
-          Cadastre despesas fixas em <span className="text-indigo-300">Financeiro &gt; Despesas</span> para a calculadora ficar mais precisa.
+      <div className="text-right flex-shrink-0">
+        <p className="font-display tracking-tight text-white"
+           style={{ fontSize: 'clamp(28px, 3vw, 44px)', fontVariationSettings: '"opsz" 96, "SOFT" 30' }}>
+          <span className="text-slate-300/60 text-sm font-mono mr-1.5">R$</span>
+          <span className="font-numeric">{numToMask(value)}</span>
         </p>
-      )}
+      </div>
     </div>
   )
 }
 
-// ── Card ──────────────────────────────────────────────────────────────────────
+// ── Card de proposta ──────────────────────────────────────────────────────────
 
 function ProposalCard({ p, onEdit, onDelete, onStatus }: {
   p: Proposal
@@ -619,72 +713,100 @@ function ProposalCard({ p, onEdit, onDelete, onStatus }: {
   onStatus: (s: Proposal['status']) => void
 }) {
   const meta  = STATUS_META[p.status]
-  const Icon  = meta.icon
+  const Icon  = STATUS_ICON[p.status]
   const meses = RECORRENCIA_MESES[p.recorrencia]
   const mensalidadeNum = parseBRL(p.mensalidade_valor) ?? 0
   const setupNum       = parseBRL(p.setup_valor) ?? 0
   const totalPeriodo   = setupNum + mensalidadeNum * meses
 
   return (
-    <div className="group flex flex-col gap-3 p-5 rounded-2xl bg-slate-900/70 border border-white/[0.07] hover:border-white/[0.13] transition-all">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-white font-semibold text-sm truncate">{p.titulo}</h3>
-          <p className="text-slate-300 text-xs mt-0.5 truncate">
-            {p.cliente_nome}
-            {!p.client_id && <span className="ml-1.5 text-amber-300/80">· lead</span>}
-          </p>
-          {p.cliente_telefone && (
-            <p className="text-slate-300 text-[11px] mt-0.5 truncate">{p.cliente_telefone}</p>
-          )}
-        </div>
-        <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full ring-1 ${meta.cls}`}>
+    <article className="group relative bg-[#0a0c11] border border-white/[0.06] hover:border-white/[0.14]
+                        rounded-2xl p-6 transition-colors">
+      {/* Status */}
+      <div className="flex items-center justify-between mb-5">
+        <span className={`inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider ${meta.tone}`}>
           <Icon className="w-3 h-3" />
           {meta.label}
         </span>
+        <span className="text-[10px] font-mono uppercase tracking-widest text-slate-300/50">
+          {p.data_envio ? formatDate(p.data_envio) : '—'}
+        </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <div>
-          <p className="text-slate-300 text-[10px] uppercase tracking-wider">Setup</p>
-          <p className="text-emerald-400 font-semibold mt-0.5">R$ {p.setup_valor || '0,00'}</p>
-        </div>
-        <div>
-          <p className="text-slate-300 text-[10px] uppercase tracking-wider">{RECORRENCIA_LABEL[p.recorrencia]}</p>
-          <p className="text-emerald-400 font-semibold mt-0.5">R$ {p.mensalidade_valor || '0,00'}</p>
-        </div>
-      </div>
+      {/* Cliente + título */}
+      <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60 truncate">
+        {p.cliente_nome}
+        {!p.client_id && <span className="ml-2 text-amber-300/70 normal-case tracking-normal">· lead</span>}
+      </p>
+      <h3 className="font-display text-2xl text-white tracking-tight mt-2 leading-tight line-clamp-2"
+          style={{ fontVariationSettings: '"opsz" 48, "SOFT" 40' }}>
+        {p.titulo}
+      </h3>
 
-      <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] px-3 py-2 flex items-center justify-between">
-        <span className="text-slate-300 text-[11px]">Total no período ({meses}m)</span>
-        <span className="text-white font-semibold text-sm">R$ {numToMask(totalPeriodo)}</span>
-      </div>
-
-      {p.descricao && <p className="text-slate-300 text-xs leading-relaxed line-clamp-2">{p.descricao}</p>}
-
-      {p.data_envio && (
-        <p className="text-slate-300 text-[11px]">Enviada em {formatDate(p.data_envio)}</p>
+      {p.cliente_telefone && (
+        <p className="text-slate-300/70 text-[11px] font-numeric mt-1.5">{p.cliente_telefone}</p>
       )}
 
-      <div className="flex items-center gap-1 pt-1 border-t border-white/[0.05]">
+      {/* Valores */}
+      <div className="mt-6 pt-5 border-t border-white/[0.05] grid grid-cols-2 gap-4">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60">Setup</p>
+          <p className="text-emerald-200 font-display text-xl mt-1.5"
+             style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
+            <span className="text-slate-300/60 text-xs font-mono mr-0.5">R$</span>
+            <span className="font-numeric">{p.setup_valor || '0,00'}</span>
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60">
+            {RECORRENCIA_LABEL[p.recorrencia]}
+          </p>
+          <p className="text-emerald-200 font-display text-xl mt-1.5"
+             style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
+            <span className="text-slate-300/60 text-xs font-mono mr-0.5">R$</span>
+            <span className="font-numeric">{p.mensalidade_valor || '0,00'}</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Total no período */}
+      <div className="mt-5 flex items-baseline justify-between">
+        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60">
+          total · {meses}m
+        </span>
+        <span className="font-numeric text-white text-base font-medium">
+          R$ {numToMask(totalPeriodo)}
+        </span>
+      </div>
+
+      {p.descricao && (
+        <p className="text-slate-300/80 text-xs leading-relaxed line-clamp-2 mt-4 font-display italic"
+           style={{ fontVariationSettings: '"opsz" 14, "SOFT" 60' }}>
+          {p.descricao}
+        </p>
+      )}
+
+      {/* Ações */}
+      <div className="mt-6 pt-4 border-t border-white/[0.05] flex items-center gap-2">
         <select value={p.status} onChange={e => onStatus(e.target.value as Proposal['status'])}
-          className="flex-1 px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500/40">
+          className="flex-1 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-200
+                     text-[11px] font-mono uppercase tracking-wider focus:outline-none focus:border-white/20 cursor-pointer">
           {(Object.keys(STATUS_META) as Proposal['status'][]).map(s => (
-            <option key={s} value={s} className="bg-slate-800">{STATUS_META[s].label}</option>
+            <option key={s} value={s} className="bg-slate-900 normal-case">{STATUS_META[s].label}</option>
           ))}
         </select>
-        <button onClick={onEdit} className="p-1.5 rounded-lg text-slate-300 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors">
+        <button onClick={onEdit} className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/[0.05] transition-colors">
           <Pencil className="w-3.5 h-3.5" />
         </button>
-        <button onClick={onDelete} className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+        <button onClick={onDelete} className="p-2 rounded-full text-slate-300 hover:text-rose-300 hover:bg-rose-500/10 transition-colors">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
-    </div>
+    </article>
   )
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Página ────────────────────────────────────────────────────────────────────
 
 export default function Propostas() {
   const [items, setItems]             = useState<Proposal[]>([])
@@ -726,8 +848,8 @@ export default function Propostas() {
     ])
     if (e) setError('Erro ao carregar propostas.')
     else if (props) setItems(props.map(fromDB))
-    if (cls)      setClients(cls as Client[])
-    if (expFixas) setCusto(expFixas.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
+    if (cls)        setClients(cls as Client[])
+    if (expFixas)   setCusto(expFixas.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
     if (expAvulsas) setDespesasMes(expAvulsas.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
     if (mens) {
       setReceita(mens.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
@@ -736,24 +858,6 @@ export default function Propostas() {
     if (entradas) setEntradasMes(entradas.reduce((s, r: { valor: number }) => s + (Number(r.valor) || 0), 0))
     setLoading(false)
   }
-
-  // Agregados de propostas para projeção
-  const projecao = useMemo(() => {
-    const sumBy = (status: Proposal['status']) => items
-      .filter(i => i.status === status)
-      .reduce((acc, p) => ({
-        mens: acc.mens + (parseBRL(p.mensalidade_valor) ?? 0),
-        setup: acc.setup + (parseBRL(p.setup_valor) ?? 0),
-      }), { mens: 0, setup: 0 })
-    const aceitas  = sumBy('aceita')
-    const enviadas = sumBy('enviada')
-    return {
-      mensalidadeAceitas:  aceitas.mens,
-      setupAceitas:        aceitas.setup,
-      mensalidadeEnviadas: enviadas.mens,
-      setupEnviadas:       enviadas.setup,
-    }
-  }, [items])
 
   async function handleSave(data: Omit<Proposal, 'id'>) {
     setError('')
@@ -806,28 +910,76 @@ export default function Propostas() {
     recusada: items.filter(i => i.status === 'recusada').length,
   }), [items])
 
+  const projecao = useMemo(() => {
+    const sumBy = (status: Proposal['status']) => items
+      .filter(i => i.status === status)
+      .reduce((acc, p) => ({
+        mens: acc.mens + (parseBRL(p.mensalidade_valor) ?? 0),
+        setup: acc.setup + (parseBRL(p.setup_valor) ?? 0),
+      }), { mens: 0, setup: 0 })
+    const aceitas  = sumBy('aceita')
+    const enviadas = sumBy('enviada')
+    return {
+      mensalidadeAceitas:  aceitas.mens,
+      setupAceitas:        aceitas.setup,
+      mensalidadeEnviadas: enviadas.mens,
+      setupEnviadas:       enviadas.setup,
+    }
+  }, [items])
+
+  const hoje    = new Date()
+  const mesNome = MES_NOME[hoje.getMonth()]
+  const ano     = hoje.getFullYear()
+
   return (
-    <>
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-[1400px] mx-auto pb-16">
+
+      {/* Editorial header */}
+      <header className="flex items-end justify-between gap-6 mb-12 pt-2">
         <div>
-          <h1 className="text-white font-bold text-xl">Propostas</h1>
-          <p className="text-slate-300 text-sm mt-0.5">
-            {loading ? 'Carregando…' : `${items.length} ${items.length === 1 ? 'proposta' : 'propostas'}`}
+          <p className="text-[10px] font-mono uppercase tracking-[0.35em] text-slate-300/70">
+            Edição · {mesNome} {ano}
+          </p>
+          <h1 className="font-display text-white mt-2 leading-[0.95] tracking-tight"
+              style={{
+                fontSize: 'clamp(48px, 7vw, 88px)',
+                fontVariationSettings: '"opsz" 144, "SOFT" 30',
+                fontWeight: 400,
+              }}>
+            Propostas<span className="text-indigo-300/90 italic ml-1" style={{ fontVariationSettings: '"opsz" 144, "SOFT" 100' }}>.</span>
+          </h1>
+          <p className="text-slate-300 text-sm mt-3 max-w-md font-display italic"
+             style={{ fontVariationSettings: '"opsz" 14, "SOFT" 60' }}>
+            {loading
+              ? 'lendo o pulso financeiro do mês…'
+              : `${items.length} ${items.length === 1 ? 'proposta em circulação' : 'propostas em circulação'} — uma visão da pipeline e da saúde do negócio.`}
           </p>
         </div>
-        <button onClick={() => { setInitial(EMPTY); setEditId(null); setModal(true) }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 transition-all duration-300">
-          <Plus className="w-4 h-4" />Nova Proposta
+        <button
+          onClick={() => { setInitial(EMPTY); setEditId(null); setModal(true) }}
+          className="hidden sm:flex items-center gap-2 px-5 py-3 rounded-full text-slate-900 text-sm font-semibold
+                     bg-white hover:bg-slate-100 transition-colors shrink-0">
+          <Plus className="w-4 h-4" strokeWidth={2.5} />
+          Nova proposta
         </button>
-      </div>
+      </header>
+
+      {/* Mobile CTA */}
+      <button
+        onClick={() => { setInitial(EMPTY); setEditId(null); setModal(true) }}
+        className="sm:hidden mb-8 w-full flex items-center justify-center gap-2 py-3 rounded-full text-slate-900 text-sm font-semibold bg-white">
+        <Plus className="w-4 h-4" strokeWidth={2.5} />
+        Nova proposta
+      </button>
 
       {error && (
-        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+        <div className="mb-6 flex items-center gap-3 px-5 py-3 rounded-2xl bg-rose-500/[0.06] border border-rose-500/15 text-rose-200 text-sm">
           {error}
           <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
         </div>
       )}
 
+      {/* Saúde do mês */}
       <SaudeMes
         receitaRecorrente={receita}
         entradasMes={entradasMes}
@@ -836,6 +988,7 @@ export default function Propostas() {
         qtdMensalidadesAtivas={qtdMensAtivas}
       />
 
+      {/* Projeção 12 meses */}
       <ProjecaoChart
         receitaRecorrente={receita}
         custoFixo={custoFixo}
@@ -845,42 +998,68 @@ export default function Propostas() {
         setupEnviadas={projecao.setupEnviadas}
       />
 
+      {/* Calculadora */}
       <Calculadora
         custoFixoMensal={custoFixo}
         receitaRecorrente={receita}
         qtdClientesAtivos={qtdMensAtivas}
       />
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2 mb-5">
-        {([
-          ['todas',    'Todas'],
-          ['enviada',  'Enviadas'],
-          ['aceita',   'Aceitas'],
-          ['recusada', 'Recusadas'],
-          ['rascunho', 'Rascunhos'],
-        ] as const).map(([key, label]) => (
-          <button key={key} onClick={() => setFilter(key)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all
-              ${filter === key
-                ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
-                : 'bg-white/[0.03] border-white/10 text-slate-300 hover:border-white/20'}`}>
-            {label} <span className="opacity-70">· {counts[key]}</span>
-          </button>
-        ))}
+      {/* Pipeline / Filtros */}
+      <div className="flex items-baseline justify-between gap-6 flex-wrap mb-8">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-300/70">
+            Pipeline
+          </p>
+          <h2 className="font-display text-3xl text-white mt-1.5 tracking-tight"
+              style={{ fontVariationSettings: '"opsz" 96, "SOFT" 30' }}>
+            Em <span className="italic text-slate-300/80" style={{ fontVariationSettings: '"opsz" 96, "SOFT" 80' }}>circulação</span>
+          </h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          {([
+            ['todas',    'Todas'],
+            ['enviada',  'Enviadas'],
+            ['aceita',   'Aceitas'],
+            ['recusada', 'Recusadas'],
+            ['rascunho', 'Rascunhos'],
+          ] as const).map(([key, label]) => {
+            const active = filter === key
+            return (
+              <button key={key} onClick={() => setFilter(key)}
+                className={`px-4 py-2 rounded-full text-[11px] font-medium tracking-wide transition-all
+                  ${active
+                    ? 'bg-white text-slate-900'
+                    : 'text-slate-300 hover:text-white hover:bg-white/[0.04]'}`}>
+                {label}
+                <span className={`ml-1.5 font-mono ${active ? 'text-slate-500' : 'text-slate-300/50'}`}>
+                  {counts[key]}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 text-indigo-400 animate-spin" /></div>
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="w-6 h-6 text-slate-300/70 animate-spin" />
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-48 text-center">
-          <FileText className="w-8 h-8 text-slate-300 mb-3" />
-          <p className="text-slate-300 text-sm">
-            {items.length === 0 ? 'Nenhuma proposta cadastrada' : 'Nenhuma proposta neste filtro'}
+        <div className="flex flex-col items-center justify-center text-center py-20 border border-dashed border-white/[0.06] rounded-3xl">
+          <p className="font-display text-3xl text-white tracking-tight"
+             style={{ fontVariationSettings: '"opsz" 96, "SOFT" 60' }}>
+            Nada por aqui ainda.
+          </p>
+          <p className="text-slate-300 text-sm mt-3 max-w-sm font-display italic"
+             style={{ fontVariationSettings: '"opsz" 14, "SOFT" 60' }}>
+            {items.length === 0
+              ? 'crie sua primeira proposta para ver o impacto na projeção.'
+              : 'nenhuma proposta neste filtro — tente outro recorte.'}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.map(p => (
             <ProposalCard key={p.id} p={p}
               onEdit={() => { const { id, ...r } = p; setInitial(r); setEditId(id); setModal(true) }}
@@ -894,6 +1073,6 @@ export default function Propostas() {
         <ProposalModal initial={initial} editing={!!editId} clients={clients}
           onSave={handleSave} onClose={() => setModal(false)} />
       )}
-    </>
+    </div>
   )
 }

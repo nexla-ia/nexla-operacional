@@ -482,7 +482,7 @@ export default function FluxoCaixa() {
 
       {/* Pipeline de propostas */}
       {proposals.length > 0 && (
-        <PipelinePropostas proposals={proposals} />
+        <PipelinePropostas proposals={proposals} receitaRecorrente={receitaRecorrente} />
       )}
 
       {/* Projeção 12m */}
@@ -967,7 +967,7 @@ function ProjetosAndamento({ projects }: { projects: ProjectRow[] }) {
 
 // ── Pipeline de propostas ─────────────────────────────────────────────────────
 
-function PipelinePropostas({ proposals }: { proposals: ProposalRow[] }) {
+function PipelinePropostas({ proposals, receitaRecorrente }: { proposals: ProposalRow[]; receitaRecorrente: number }) {
   const aceitas  = proposals.filter(p => p.status === 'aceita')
   const enviadas = proposals.filter(p => p.status === 'enviada')
   const recusadas = proposals.filter(p => p.status === 'recusada')
@@ -979,6 +979,17 @@ function PipelinePropostas({ proposals }: { proposals: ProposalRow[] }) {
   const aceitasSetup = sumSetup(aceitas)
   const enviadasMens  = sumMens(enviadas)
   const enviadasSetup = sumSetup(enviadas)
+
+  const totalComAceitas    = receitaRecorrente + aceitasMens
+  const totalComEnviadas   = totalComAceitas + enviadasMens
+  const cresceComAceitas   = receitaRecorrente > 0 ? ((aceitasMens / receitaRecorrente) * 100) : 0
+  const cresceComEnviadas  = receitaRecorrente > 0 ? ((enviadasMens / receitaRecorrente) * 100) : 0
+
+  // Para a barra de proporção
+  const totalBar = Math.max(totalComEnviadas, 1)
+  const pctAtual    = (receitaRecorrente / totalBar) * 100
+  const pctAceitas  = (aceitasMens        / totalBar) * 100
+  const pctEnviadas = (enviadasMens       / totalBar) * 100
 
   if (aceitas.length === 0 && enviadas.length === 0) return null
 
@@ -999,6 +1010,118 @@ function PipelinePropostas({ proposals }: { proposals: ProposalRow[] }) {
             <XCircle className="w-3 h-3" />
             {recusadas.length} recusada{recusadas.length === 1 ? '' : 's'}
           </span>
+        )}
+      </div>
+
+      {/* Cenário de receita projetada */}
+      <div className="bg-[#0a0c11] border border-white/[0.06] rounded-3xl p-6 sm:p-8 mb-4">
+        <div className="flex items-baseline justify-between mb-5 flex-wrap gap-3">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-300/70">
+              Receita mensal · cenários
+            </p>
+            <p className="text-slate-300 text-xs mt-1 font-display italic"
+               style={{ fontVariationSettings: '"opsz" 14, "SOFT" 60' }}>
+              quanto entra todo mês conforme o pipeline avança
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-300/70">Potencial total</p>
+            <p className="font-display text-2xl mt-0.5"
+               style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
+              <span className="text-slate-300/60 text-sm font-mono mr-1">R$</span>
+              <span className="font-numeric text-emerald-200">{numToMask(totalComEnviadas)}</span>
+              <span className="text-slate-300/50 text-xs font-mono ml-2">/mês</span>
+            </p>
+            {receitaRecorrente > 0 && (
+              <p className="text-[10px] font-mono text-amber-300/80 mt-0.5">
+                +{((totalComEnviadas - receitaRecorrente) / receitaRecorrente * 100).toFixed(0)}% sobre o atual
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Stack de cenários */}
+        <div className="space-y-3">
+          {/* Atual */}
+          <div className="flex items-center gap-4">
+            <div className="w-32 sm:w-40 shrink-0">
+              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/70">Hoje</p>
+              <p className="text-slate-300/70 text-[11px] mt-0.5">mensalidades ativas</p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="h-7 rounded-md bg-white/[0.04] overflow-hidden flex items-center">
+                <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all duration-700"
+                     style={{ width: `${pctAtual}%` }} />
+              </div>
+            </div>
+            <div className="w-36 sm:w-44 text-right shrink-0">
+              <p className="font-numeric text-emerald-300 text-base font-medium">
+                R$ {numToMask(receitaRecorrente)}
+              </p>
+              <p className="text-slate-300/50 text-[10px] font-mono">/mês</p>
+            </div>
+          </div>
+
+          {/* + Aceitas */}
+          <div className="flex items-center gap-4">
+            <div className="w-32 sm:w-40 shrink-0">
+              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-emerald-300/90">+ Aceitas</p>
+              <p className="text-slate-300/70 text-[11px] mt-0.5">já garantidas</p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="h-7 rounded-md bg-white/[0.04] overflow-hidden flex">
+                <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all duration-700"
+                     style={{ width: `${pctAtual}%` }} />
+                <div className="h-full bg-gradient-to-r from-emerald-400/70 to-emerald-300/70 transition-all duration-700"
+                     style={{ width: `${pctAceitas}%` }} />
+              </div>
+            </div>
+            <div className="w-36 sm:w-44 text-right shrink-0">
+              <p className="font-numeric text-emerald-200 text-base font-medium">
+                R$ {numToMask(totalComAceitas)}
+              </p>
+              <p className="text-slate-300/50 text-[10px] font-mono">
+                /mês {aceitasMens > 0 && <span className="text-emerald-300/70">· +{cresceComAceitas.toFixed(0)}%</span>}
+              </p>
+            </div>
+          </div>
+
+          {/* + Enviadas (otimista) */}
+          <div className="flex items-center gap-4">
+            <div className="w-32 sm:w-40 shrink-0">
+              <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-amber-300/90">+ Enviadas</p>
+              <p className="text-slate-300/70 text-[11px] mt-0.5">se fechar tudo</p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="h-7 rounded-md bg-white/[0.04] overflow-hidden flex">
+                <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all duration-700"
+                     style={{ width: `${pctAtual}%` }} />
+                <div className="h-full bg-gradient-to-r from-emerald-400/70 to-emerald-300/70 transition-all duration-700"
+                     style={{ width: `${pctAceitas}%` }} />
+                <div className="h-full bg-gradient-to-r from-amber-400/70 to-amber-300/70 transition-all duration-700"
+                     style={{ width: `${pctEnviadas}%` }} />
+              </div>
+            </div>
+            <div className="w-36 sm:w-44 text-right shrink-0">
+              <p className="font-numeric text-amber-200 text-base font-medium">
+                R$ {numToMask(totalComEnviadas)}
+              </p>
+              <p className="text-slate-300/50 text-[10px] font-mono">
+                /mês {enviadasMens > 0 && <span className="text-amber-300/70">· +{cresceComEnviadas.toFixed(0)}%</span>}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {(aceitasSetup > 0 || enviadasSetup > 0) && (
+          <p className="text-slate-300/60 text-[11px] mt-4 pt-4 border-t border-white/[0.05]">
+            Não inclui setups — adicionalmente,
+            {aceitasSetup > 0 && <> <span className="text-emerald-300 font-numeric">R$ {numToMask(aceitasSetup)}</span> de setups já garantidos</>}
+            {aceitasSetup > 0 && enviadasSetup > 0 && ' e'}
+            {enviadasSetup > 0 && <> <span className="text-amber-300 font-numeric">R$ {numToMask(enviadasSetup)}</span> em setups potenciais</>}
+            .
+          </p>
         )}
       </div>
 

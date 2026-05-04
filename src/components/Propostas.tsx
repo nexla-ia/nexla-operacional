@@ -4,13 +4,14 @@ import {
   TrendingUp, AlertTriangle, CheckCircle2, Clock, XCircle,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { maskBRL, parseBRL, numToMask, formatDate } from '../lib/utils'
+import { maskBRL, parseBRL, numToMask, formatDate, maskPhone } from '../lib/utils'
 import type { Proposal, Client } from '../lib/types'
 import { SearchableSelect } from './SearchableSelect'
 
 const EMPTY: Omit<Proposal, 'id'> = {
   client_id: undefined,
   cliente_nome: '',
+  cliente_telefone: '',
   titulo: '',
   descricao: '',
   setup_valor: '',
@@ -51,6 +52,7 @@ function fromDB(r: Record<string, unknown>): Proposal {
     id:                 r.id as string,
     client_id:          (r.client_id as string) || undefined,
     cliente_nome:       (r.cliente_nome as string) ?? '',
+    cliente_telefone:   (r.cliente_telefone as string) ?? '',
     titulo:             (r.titulo as string) ?? '',
     descricao:          (r.descricao as string) ?? '',
     setup_valor:        numToMask(r.setup_valor as number | null),
@@ -73,21 +75,34 @@ function ProposalModal({ initial, editing, clients, onSave, onClose }: {
 }) {
   const [form, setForm]     = useState(initial)
   const [saving, setSaving] = useState(false)
+  const [mode, setMode]     = useState<'cliente' | 'lead'>(initial.client_id ? 'cliente' : 'lead')
   const set = <K extends keyof Omit<Proposal, 'id'>>(k: K, v: Proposal[K]) =>
     setForm(f => ({ ...f, [k]: v }))
 
   function handleClient(id: string) {
     if (!id) {
-      set('client_id', undefined); set('cliente_nome', ''); return
+      set('client_id', undefined); set('cliente_nome', ''); set('cliente_telefone', ''); return
     }
     const c = clients.find(c => c.id === id)
     if (!c) return
-    setForm(f => ({ ...f, client_id: c.id, cliente_nome: c.nome }))
+    setForm(f => ({ ...f, client_id: c.id, cliente_nome: c.nome, cliente_telefone: c.telefone || '' }))
+  }
+
+  function switchMode(next: 'cliente' | 'lead') {
+    setMode(next)
+    // Limpa vínculo ao trocar para "lead"
+    if (next === 'lead') {
+      setForm(f => ({ ...f, client_id: undefined }))
+    } else {
+      setForm(f => ({ ...f, client_id: undefined, cliente_nome: '', cliente_telefone: '' }))
+    }
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.titulo.trim() || !form.client_id) return
+    if (!form.titulo.trim()) return
+    if (mode === 'cliente' && !form.client_id) return
+    if (mode === 'lead' && !form.cliente_nome.trim()) return
     setSaving(true)
     await onSave(form)
     setSaving(false)
@@ -112,23 +127,51 @@ function ProposalModal({ initial, editing, clients, onSave, onClose }: {
         </div>
 
         <form onSubmit={submit} className="px-7 py-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* Cliente */}
-          <div>
-            <label className={labelCls}>Cliente *</label>
-            {clients.length === 0 ? (
-              <div className="w-full px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
-                Cadastre um cliente primeiro.
-              </div>
-            ) : (
-              <SearchableSelect
-                required
-                value={form.client_id ?? ''}
-                onChange={handleClient}
-                placeholder="Selecione um cliente…"
-                options={clients.map(c => ({ value: c.id, label: c.nome, sublabel: c.cpf_cnpj || c.telefone || undefined }))}
-              />
-            )}
+          {/* Toggle Cliente cadastrado / Lead novo */}
+          <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+            {(['cliente', 'lead'] as const).map(m => (
+              <button key={m} type="button" onClick={() => switchMode(m)}
+                className={`py-2 rounded-lg text-xs font-semibold transition-all
+                  ${mode === m
+                    ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/30'
+                    : 'text-slate-300 hover:text-white'}`}>
+                {m === 'cliente' ? 'Cliente cadastrado' : 'Lead / sem cadastro'}
+              </button>
+            ))}
           </div>
+
+          {mode === 'cliente' ? (
+            <div>
+              <label className={labelCls}>Cliente *</label>
+              {clients.length === 0 ? (
+                <div className="w-full px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
+                  Nenhum cliente cadastrado. Use o modo "Lead / sem cadastro".
+                </div>
+              ) : (
+                <SearchableSelect
+                  required
+                  value={form.client_id ?? ''}
+                  onChange={handleClient}
+                  placeholder="Selecione um cliente…"
+                  options={clients.map(c => ({ value: c.id, label: c.nome, sublabel: c.cpf_cnpj || c.telefone || undefined }))}
+                />
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Nome do Lead *</label>
+                <input className={inputCls} placeholder="Ex: João Silva" required
+                  value={form.cliente_nome} onChange={e => set('cliente_nome', e.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>Telefone / WhatsApp</label>
+                <input className={inputCls} placeholder="(00) 00000-0000" inputMode="tel"
+                  value={form.cliente_telefone}
+                  onChange={e => set('cliente_telefone', maskPhone(e.target.value))} />
+              </div>
+            </div>
+          )}
 
           {/* Título */}
           <div>
@@ -213,7 +256,8 @@ function ProposalModal({ initial, editing, clients, onSave, onClose }: {
           </div>
 
           <div className="flex gap-3 pt-1">
-            <button type="submit" disabled={saving || !form.client_id}
+            <button type="submit"
+              disabled={saving || (mode === 'cliente' ? !form.client_id : !form.cliente_nome.trim())}
               className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold btn-shimmer
                          shadow-lg shadow-indigo-500/25 disabled:opacity-60 disabled:cursor-not-allowed
                          hover:-translate-y-0.5 transition-all duration-300">
@@ -369,7 +413,13 @@ function ProposalCard({ p, onEdit, onDelete, onStatus }: {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="text-white font-semibold text-sm truncate">{p.titulo}</h3>
-          <p className="text-slate-300 text-xs mt-0.5 truncate">{p.cliente_nome}</p>
+          <p className="text-slate-300 text-xs mt-0.5 truncate">
+            {p.cliente_nome}
+            {!p.client_id && <span className="ml-1.5 text-amber-300/80">· lead</span>}
+          </p>
+          {p.cliente_telefone && (
+            <p className="text-slate-300 text-[11px] mt-0.5 truncate">{p.cliente_telefone}</p>
+          )}
         </div>
         <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full ring-1 ${meta.cls}`}>
           <Icon className="w-3 h-3" />
@@ -454,6 +504,7 @@ export default function Propostas() {
     const payload = {
       client_id:         data.client_id || null,
       cliente_nome:      data.cliente_nome,
+      cliente_telefone:  data.cliente_telefone || null,
       titulo:            data.titulo,
       descricao:         data.descricao || null,
       setup_valor:       parseBRL(data.setup_valor) ?? 0,

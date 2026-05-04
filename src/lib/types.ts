@@ -73,6 +73,7 @@ export interface Proposal {
   id: string
   client_id?: string
   cliente_nome: string
+  cliente_telefone: string
   titulo: string
   descricao: string
   setup_valor: string

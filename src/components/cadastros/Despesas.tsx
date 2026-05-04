@@ -179,6 +179,7 @@ export default function Despesas() {
   const [modal, setModal]     = useState(false)
   const [editId, setEditId]   = useState<string | null>(null)
   const [initial, setInitial] = useState<Omit<Expense, 'id'>>(EMPTY)
+  const [showPagas, setShowPagas] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -228,7 +229,19 @@ export default function Despesas() {
   function openNew()       { setInitial({ ...EMPTY, tipo: tab === 'todos' ? 'avulsa' : tab }); setEditId(null); setModal(true) }
   function openEdit(i: Expense) { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }
 
-  const filtered = tab === 'todos' ? items : items.filter(i => i.tipo === tab)
+  // Início do mês corrente (yyyy-mm-dd)
+  const hoje      = new Date()
+  const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
+
+  // Avulsas pagas com data anterior ao mês corrente são "histórico" — escondidas por padrão
+  const isAvulsaPagaAnterior = (i: Expense) =>
+    i.tipo === 'avulsa' && i.pago && i.data && i.data < inicioMes
+
+  const ocultas = items.filter(isAvulsaPagaAnterior).length
+
+  const filtered = items
+    .filter(i => tab === 'todos' ? true : i.tipo === tab)
+    .filter(i => showPagas ? true : !isAvulsaPagaAnterior(i))
 
   function dataLabel(i: Expense) {
     if (i.tipo === 'fixa') {
@@ -406,6 +419,19 @@ export default function Despesas() {
         <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/15 text-red-400 text-sm font-medium">
           {error}
           <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {/* Toggle histórico de avulsas pagas */}
+      {!loading && tab !== 'fixa' && ocultas > 0 && (
+        <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] animate-stagger-2">
+          <p className="text-slate-400 text-xs">
+            <span className="text-slate-300 font-semibold">{ocultas}</span> avulsa{ocultas === 1 ? '' : 's'} paga{ocultas === 1 ? '' : 's'} de meses anteriores {showPagas ? 'visíveis' : 'ocultas'}
+          </p>
+          <button onClick={() => setShowPagas(v => !v)}
+            className="text-xs font-semibold text-indigo-300 hover:text-indigo-200 transition-colors">
+            {showPagas ? 'Ocultar histórico' : 'Mostrar histórico'}
+          </button>
         </div>
       )}
 

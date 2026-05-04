@@ -596,6 +596,7 @@ function ProjecaoChart12m({ projecoes, custoFixo, saldoCaixa }: {
   custoFixo: number
   saldoCaixa: number
 }) {
+  const [hover, setHover] = useState<number | null>(null)
   const totaisReceita = projecoes.map(p => p.receitaBase + p.extraAceitas + p.extraEnviadas)
   const maxReceitaDespesa = Math.max(...totaisReceita, ...projecoes.map(p => p.despesa), 1) * 1.2
 
@@ -660,8 +661,9 @@ function ProjecaoChart12m({ projecoes, custoFixo, saldoCaixa }: {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+      <div className="overflow-x-auto relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet"
+          onMouseLeave={() => setHover(null)}>
           <defs>
             <linearGradient id="grBase" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%"  stopColor="rgb(52,211,153)" stopOpacity="0.95" />
@@ -771,13 +773,84 @@ function ProjecaoChart12m({ projecoes, custoFixo, saldoCaixa }: {
           {/* Eixo X */}
           {projecoes.map((p, i) => (
             <text key={i} x={padL + step * i + step / 2} y={H - 14}
-              fill={i === 0 ? 'rgba(255,255,255,0.85)' : 'rgba(203,213,225,0.55)'}
+              fill={hover === i ? 'rgba(165,180,252,1)' : i === 0 ? 'rgba(255,255,255,0.85)' : 'rgba(203,213,225,0.55)'}
               fontSize="9" fontFamily="JetBrains Mono" textAnchor="middle"
               letterSpacing="1.5">
               {p.label.toUpperCase()}
             </text>
           ))}
+
+          {/* Highlight da coluna hovered */}
+          {hover !== null && (
+            <line
+              x1={padL + step * hover + step / 2}
+              x2={padL + step * hover + step / 2}
+              y1={padT}
+              y2={padT + innerH}
+              stroke="rgba(165,180,252,0.25)"
+              strokeWidth="1"
+              strokeDasharray="2 3"
+              pointerEvents="none"
+            />
+          )}
+
+          {/* Hover targets invisíveis */}
+          {projecoes.map((_, i) => (
+            <rect key={'hov-' + i}
+              x={padL + step * i} y={padT}
+              width={step} height={innerH}
+              fill="transparent"
+              onMouseEnter={() => setHover(i)}
+              style={{ cursor: 'crosshair' }}
+            />
+          ))}
         </svg>
+
+        {/* Tooltip */}
+        {hover !== null && (() => {
+          const p = projecoes[hover]
+          const totalReceitaOtimista = p.receitaBase + p.extraAceitas + p.extraEnviadas
+          const xPct = ((padL + step * hover + step / 2) / W) * 100
+          const alignRight = hover >= 8
+          return (
+            <div
+              className="absolute pointer-events-none z-10"
+              style={{
+                left: `${xPct}%`,
+                top: '8px',
+                transform: alignRight ? 'translateX(-100%) translateX(-12px)' : 'translateX(12px)',
+              }}>
+              <div className="bg-[#0a0c11]/98 border border-white/[0.10] rounded-xl px-4 py-3 shadow-2xl shadow-black/60 backdrop-blur-md min-w-[220px]">
+                <div className="flex items-center justify-between gap-3 pb-2 mb-2 border-b border-white/[0.06]">
+                  <p className="font-display text-base text-white tracking-tight"
+                     style={{ fontVariationSettings: '"opsz" 24, "SOFT" 30' }}>
+                    {p.label.charAt(0).toUpperCase() + p.label.slice(1)}
+                  </p>
+                  {hover === 0 && <span className="text-[9px] font-mono uppercase tracking-widest text-indigo-300">agora</span>}
+                </div>
+
+                <div className="space-y-1 text-[11px] font-mono">
+                  <RowTip label="receita base"   value={p.receitaBase}   color="text-emerald-300" />
+                  {p.extraAceitas > 0 && (
+                    <RowTip label="+ aceitas"    value={p.extraAceitas}  color="text-emerald-200" />
+                  )}
+                  {p.extraEnviadas > 0 && (
+                    <RowTip label="+ enviadas"   value={p.extraEnviadas} color="text-amber-200" />
+                  )}
+                  <RowTip label="receita total"  value={totalReceitaOtimista} color="text-white" bold />
+                  <RowTip label="despesa"        value={p.despesa}       color="text-rose-300" negative />
+                </div>
+
+                <div className="space-y-1 text-[11px] font-mono pt-2 mt-2 border-t border-white/[0.06]">
+                  <p className="text-[9px] text-slate-300/60 uppercase tracking-widest mb-1">saldo acumulado</p>
+                  <RowTip label="base"          value={p.saldoBase}     color={p.saldoBase < 0 ? 'text-rose-300' : 'text-slate-200'} />
+                  <RowTip label="com aceitas"   value={p.saldoAceitas}  color={p.saldoAceitas < 0 ? 'text-rose-300' : 'text-indigo-300'} />
+                  <RowTip label="otimista"      value={p.saldoOtimista} color={p.saldoOtimista < 0 ? 'text-rose-300' : 'text-amber-300'} />
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Comparativo de cenários em 12 meses */}
@@ -810,6 +883,23 @@ function ProjecaoChart12m({ projecoes, custoFixo, saldoCaixa }: {
         />
       </div>
     </section>
+  )
+}
+
+function RowTip({ label, value, color, bold, negative }: {
+  label: string
+  value: number
+  color: string
+  bold?: boolean
+  negative?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-slate-300/70">{label}</span>
+      <span className={`${color} ${bold ? 'font-semibold' : ''} font-numeric`}>
+        {negative ? '−' : value < 0 ? '−' : ''} R$ {numToMask(Math.abs(value))}
+      </span>
+    </div>
   )
 }
 

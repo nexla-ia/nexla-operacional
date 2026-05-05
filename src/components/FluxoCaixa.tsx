@@ -107,8 +107,9 @@ export default function FluxoCaixa() {
   }
 
   async function lancarAjuste(novoSaldoReal: number, descricao: string) {
-    const calculado = saldoCaixaCalculado
-    const diff = novoSaldoReal - calculado
+    // diff calculado contra o saldo EXIBIDO (já inclui ajustes anteriores),
+    // não contra o calculado puro — senão cada correção repete o mesmo delta.
+    const diff = novoSaldoReal - saldoCaixa
     if (Math.abs(diff) < 0.01) { setModalAjuste(false); return }
     const { error } = await supabase.from('ajustes_caixa').insert({
       valor: diff,

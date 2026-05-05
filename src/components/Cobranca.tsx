@@ -84,10 +84,9 @@ Após o pagamento, basta nos enviar o comprovante. Qualquer dúvida, estou à di
 
 // ── Botão de copiar ───────────────────────────────────────────────────────────
 
-function CopyButton({ message, label = 'Copiar mensagem', compact = false }: {
+function CopyButton({ message, label = 'Copiar mensagem' }: {
   message: string
   label?: string
-  compact?: boolean
 }) {
   const [copied, setCopied] = useState(false)
   async function handleCopy() {
@@ -96,7 +95,6 @@ function CopyButton({ message, label = 'Copiar mensagem', compact = false }: {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // fallback
       const ta = document.createElement('textarea')
       ta.value = message
       document.body.appendChild(ta)
@@ -110,7 +108,7 @@ function CopyButton({ message, label = 'Copiar mensagem', compact = false }: {
   return (
     <button
       onClick={handleCopy}
-      className={`inline-flex items-center gap-1.5 ${compact ? 'px-2.5 py-1' : 'px-3.5 py-1.5'} rounded-full text-[11px] font-mono uppercase tracking-wider transition-all
+      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-wider transition-all
         ${copied
           ? 'bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/30'
           : 'bg-white text-slate-900 hover:bg-slate-100'}`}>

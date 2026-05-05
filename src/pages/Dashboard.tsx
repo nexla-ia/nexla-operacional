@@ -128,7 +128,7 @@ export default function Dashboard() {
   const [role, setRole]                   = useState<'admin' | 'operator' | null>(null)
   const [activeSection, setActiveSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen]     = useState(false)
-  const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set(['grp-projetos', 'cadastros', 'financeiro']))
+  const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set())
   const [pendingKanbanTask, setPendingKanbanTask] = useState<{ title: string; subtitle?: string; project_id?: string } | null>(null)
   const [pendingProjectClient, setPendingProjectClient] = useState<Client | null>(null)
   const [unreadErrors, setUnreadErrors]   = useState(0)

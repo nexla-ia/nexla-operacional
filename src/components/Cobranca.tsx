@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Search, RefreshCw, Loader2, X, Check, ChevronDown, Briefcase,
-  Copy, CheckCheck, AlertCircle, Calendar,
+  Copy, CheckCheck, AlertCircle, Calendar, CalendarClock,
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 
@@ -209,7 +209,9 @@ export default function Cobranca() {
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
   const [statuses, setStatuses] = useState<Record<string, PagamentoStatus>>({})
+  const [promessas, setPromessas] = useState<Record<string, string>>({})  // client_id -> data ISO
   const [userId, setUserId]     = useState<string | null>(null)
+  const [adiarFor, setAdiarFor] = useState<MensalidadeRow | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -223,12 +225,17 @@ export default function Cobranca() {
     ] = await Promise.all([
       supabase.from('mensalidades').select('*').eq('status', 'ativo').order('cliente_nome'),
       supabase.from('project_entries').select('*').order('nome_projeto'),
-      supabase.from('cobranca_pagamentos').select('client_id, status').eq('mes', MES_ATUAL),
+      supabase.from('cobranca_pagamentos').select('client_id, status, data_prometida').eq('mes', MES_ATUAL),
     ])
 
     const statusMap: Record<string, PagamentoStatus> = {}
-    for (const p of pagamentos ?? []) statusMap[p.client_id] = p.status as PagamentoStatus
+    const promessaMap: Record<string, string> = {}
+    for (const p of pagamentos ?? []) {
+      statusMap[p.client_id] = p.status as PagamentoStatus
+      if (p.data_prometida) promessaMap[p.client_id] = p.data_prometida as string
+    }
     setStatuses(statusMap)
+    setPromessas(promessaMap)
 
     const built: Row[] = [
       ...(mensalidades ?? []).map(m => ({
@@ -257,12 +264,34 @@ export default function Cobranca() {
 
   async function changeStatus(clientId: string, status: PagamentoStatus) {
     if (!userId) return
-    setStatuses(prev => ({ ...prev, [clientId]: status }))
+    setStatuses((prev: Record<string, PagamentoStatus>) => ({ ...prev, [clientId]: status }))
+    const payload: { user_id: string; client_id: string; mes: string; status: PagamentoStatus; data_prometida?: null } =
+      { user_id: userId, client_id: clientId, mes: MES_ATUAL, status }
+    if (status === 'pago') payload.data_prometida = null
     const { error } = await supabase.from('cobranca_pagamentos').upsert(
-      { user_id: userId, client_id: clientId, mes: MES_ATUAL, status },
+      payload,
       { onConflict: 'user_id,client_id,mes' }
     )
-    if (error) setStatuses(prev => { const n = { ...prev }; delete n[clientId]; return n })
+    if (error) setStatuses((prev: Record<string, PagamentoStatus>) => { const n = { ...prev }; delete n[clientId]; return n })
+    if (status === 'pago') setPromessas((prev: Record<string, string>) => { const n = { ...prev }; delete n[clientId]; return n })
+  }
+
+  async function setPromessa(clientId: string, dataISO: string | null) {
+    if (!userId) return
+    if (dataISO) {
+      setPromessas((prev: Record<string, string>) => ({ ...prev, [clientId]: dataISO }))
+    } else {
+      setPromessas((prev: Record<string, string>) => { const n = { ...prev }; delete n[clientId]; return n })
+    }
+    const status: PagamentoStatus = statuses[clientId] ?? 'nao_pago'
+    const { error } = await supabase.from('cobranca_pagamentos').upsert(
+      { user_id: userId, client_id: clientId, mes: MES_ATUAL, status, data_prometida: dataISO },
+      { onConflict: 'user_id,client_id,mes' }
+    )
+    if (error) {
+      setPromessas((prev: Record<string, string>) => { const n = { ...prev }; delete n[clientId]; return n })
+    }
+    setAdiarFor(null)
   }
 
   // ── Computed ────────────────────────────────────────────────────────────────
@@ -299,7 +328,13 @@ export default function Cobranca() {
       if (!dia) return
       const status = statuses[r.clientId] ?? 'nao_pago'
       if (status === 'pago') return
-      const due = getMensalidadeDueDate(dia, hoje)
+
+      // Se há data prometida, ela substitui o vencimento original
+      const promessa = promessas[r.clientId]
+      const due = promessa
+        ? new Date(promessa + 'T12:00:00')
+        : getMensalidadeDueDate(dia, hoje)
+
       if (isSameDay(due, hoje)) {
         iminentes.push({
           key: 'm-' + r.clientId,
@@ -471,10 +506,12 @@ export default function Cobranca() {
               <div className="bg-[#0a0c11] border border-white/[0.06] rounded-2xl overflow-hidden">
                 {mensRows.map((row, idx) => {
                   const status: PagamentoStatus = statuses[row.clientId] ?? 'nao_pago'
+                  const promessa = promessas[row.clientId]
                   const dia = parseInt(row.dia_vencimento)
-                  const due = dia ? getMensalidadeDueDate(dia, hoje) : null
-                  const venceHoje   = due && isSameDay(due, hoje)
-                  const venceAmanha = due && isSameDay(due, amanha)
+                  const dueOrig = dia ? getMensalidadeDueDate(dia, hoje) : null
+                  const dueEfetiva = promessa ? new Date(promessa + 'T12:00:00') : dueOrig
+                  const venceHoje   = dueEfetiva && isSameDay(dueEfetiva, hoje)
+                  const venceAmanha = dueEfetiva && isSameDay(dueEfetiva, amanha)
                   return (
                     <div key={row.clientId}
                       className={`flex items-center gap-4 px-5 py-4 transition-colors hover:bg-white/[0.02]
@@ -487,11 +524,28 @@ export default function Cobranca() {
                         <p className="text-white text-sm font-medium truncate">{row.clienteNome}</p>
                         <p className="text-slate-300/70 text-xs mt-0.5 truncate">
                           {row.descricao} · vence dia {row.dia_vencimento}
-                          {venceHoje   && <span className="ml-2 text-amber-300 font-mono uppercase tracking-wider">· hoje</span>}
-                          {venceAmanha && <span className="ml-2 text-amber-300/80 font-mono uppercase tracking-wider">· amanhã</span>}
+                          {promessa && (
+                            <span className="ml-2 text-indigo-300 font-mono uppercase tracking-wider">
+                              · prometido p/ {dueEfetiva!.toLocaleDateString('pt-BR')}
+                            </span>
+                          )}
+                          {!promessa && venceHoje   && <span className="ml-2 text-amber-300 font-mono uppercase tracking-wider">· hoje</span>}
+                          {!promessa && venceAmanha && <span className="ml-2 text-amber-300/80 font-mono uppercase tracking-wider">· amanhã</span>}
                         </p>
                       </div>
                       <span className="font-numeric text-rose-300 text-sm font-medium shrink-0">R$ {numToMask(row.valor)}</span>
+                      {status !== 'pago' && (
+                        <button
+                          onClick={() => setAdiarFor(row)}
+                          title={promessa ? 'Alterar promessa' : 'Cliente prometeu pagar em outra data'}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-wider transition-all whitespace-nowrap
+                            ${promessa
+                              ? 'bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-500/25 hover:bg-indigo-500/25'
+                              : 'bg-white/[0.04] text-slate-300 ring-1 ring-white/[0.08] hover:ring-white/20'}`}>
+                          <CalendarClock className="w-3 h-3" />
+                          {promessa ? 'adiada' : 'adiar'}
+                        </button>
+                      )}
                       <StatusDropdown status={status} onChange={s => changeStatus(row.clientId, s)} />
                     </div>
                   )
@@ -545,6 +599,149 @@ export default function Cobranca() {
           )}
         </div>
       )}
+
+      {adiarFor && (
+        <AdiarModal
+          row={adiarFor}
+          dataAtual={promessas[adiarFor.clientId]}
+          onSave={(dataISO) => setPromessa(adiarFor.clientId, dataISO)}
+          onClear={() => setPromessa(adiarFor.clientId, null)}
+          onClose={() => setAdiarFor(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Modal de adiar pagamento ──────────────────────────────────────────────────
+
+function AdiarModal({ row, dataAtual, onSave, onClear, onClose }: {
+  row: MensalidadeRow
+  dataAtual: string | undefined
+  onSave: (dataISO: string) => Promise<void>
+  onClear: () => Promise<void>
+  onClose: () => void
+}) {
+  const hojeISO = new Date().toISOString().slice(0, 10)
+
+  const atalhos = useMemo(() => {
+    const h = new Date()
+    const result: { label: string; iso: string }[] = []
+    for (let i = 1; i <= 5; i++) {
+      const d = new Date(h)
+      d.setDate(d.getDate() + i)
+      const dias = ['domingo','segunda','terça','quarta','quinta','sexta','sábado']
+      const label = i === 1 ? 'amanhã'
+                  : i === 2 ? 'depois de amanhã'
+                  : `${dias[d.getDay()]} (${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')})`
+      result.push({ label, iso: d.toISOString().slice(0, 10) })
+    }
+    return result
+  }, [])
+
+  const [data, setData] = useState(dataAtual || atalhos[0].iso)
+  const [saving, setSaving] = useState(false)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!data) return
+    setSaving(true)
+    await onSave(data)
+    setSaving(false)
+  }
+
+  async function handleClear() {
+    setSaving(true)
+    await onClear()
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-[#0a0c11] border border-white/[0.07] rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up">
+
+        <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.05]">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-indigo-300/80">
+              Reagendar · cobrança
+            </p>
+            <h2 className="font-display text-2xl text-white tracking-tight mt-1"
+                style={{ fontVariationSettings: '"opsz" 96, "SOFT" 30' }}>
+              Cliente vai pagar quando?
+            </h2>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/[0.05] transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="px-7 py-6 space-y-5">
+
+          <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-4">
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300/60">Cliente</p>
+            <p className="text-white text-sm font-medium mt-1 truncate">{row.clienteNome}</p>
+            <p className="text-slate-300/70 text-xs mt-0.5">
+              {row.descricao} · vence dia {row.dia_vencimento} · R$ {numToMask(row.valor)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300 mb-2">Atalhos</p>
+            <div className="flex flex-wrap gap-1.5">
+              {atalhos.map(a => {
+                const active = data === a.iso
+                return (
+                  <button key={a.iso} type="button" onClick={() => setData(a.iso)}
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-medium tracking-wide transition-all
+                      ${active
+                        ? 'bg-white text-slate-900'
+                        : 'bg-white/[0.04] text-slate-300 ring-1 ring-white/[0.08] hover:ring-white/20'}`}>
+                    {a.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-300 mb-2">Ou escolha uma data</p>
+            <input
+              type="date"
+              min={hojeISO}
+              value={data}
+              onChange={e => setData(e.target.value)}
+              style={{ colorScheme: 'dark' }}
+              className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.07] text-white text-sm focus:outline-none focus:border-white/20 transition-colors cursor-pointer"
+            />
+          </div>
+
+          <p className="text-slate-300/60 text-[11px] leading-relaxed">
+            A cobrança será deslocada para essa data. A data original (dia {row.dia_vencimento}) fica registrada — quando você marcar como "pago", a promessa é limpa automaticamente.
+          </p>
+
+          <div className="flex gap-3 pt-2">
+            <button type="submit" disabled={saving || !data}
+              className="flex-1 py-3 rounded-full text-slate-900 text-sm font-semibold bg-white
+                         hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              {saving
+                ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Salvando</span>
+                : dataAtual ? 'Atualizar promessa' : 'Reagendar'}
+            </button>
+            {dataAtual && (
+              <button type="button" onClick={handleClear} disabled={saving}
+                className="px-4 py-3 rounded-full text-rose-300 text-sm font-medium bg-rose-500/[0.06] border border-rose-500/15 hover:bg-rose-500/[0.10] transition-colors">
+                Remover
+              </button>
+            )}
+            <button type="button" onClick={onClose} disabled={saving}
+              className="px-5 py-3 rounded-full text-slate-300 text-sm font-medium bg-transparent border border-white/[0.08] hover:border-white/20 transition-colors">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

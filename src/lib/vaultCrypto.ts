@@ -11,25 +11,38 @@ const dec = new TextDecoder()
 
 // ── codificação ──────────────────────────────────────────────────────────────
 
-function bufToB64(buf: ArrayBuffer | Uint8Array): string {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
+function bytesToB64(bytes: Uint8Array): string {
   let bin = ''
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
   return btoa(bin)
 }
 
-function b64ToBuf(b64: string): Uint8Array {
+function bufToB64(buf: ArrayBuffer): string {
+  return bytesToB64(new Uint8Array(buf))
+}
+
+// Retorna ArrayBuffer "puro" (não SharedArrayBuffer) — compatível com BufferSource.
+function b64ToBuf(b64: string): ArrayBuffer {
   const bin = atob(b64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return bytes
+  const buf = new ArrayBuffer(bin.length)
+  const view = new Uint8Array(buf)
+  for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i)
+  return buf
+}
+
+function strToBuf(s: string): ArrayBuffer {
+  const bytes = enc.encode(s)
+  // copia para ArrayBuffer cru
+  const buf = new ArrayBuffer(bytes.length)
+  new Uint8Array(buf).set(bytes)
+  return buf
 }
 
 // ── derivação ────────────────────────────────────────────────────────────────
 
 export async function deriveKey(password: string, saltB64: string): Promise<CryptoKey> {
   const baseKey = await crypto.subtle.importKey(
-    'raw', enc.encode(password),
+    'raw', strToBuf(password),
     'PBKDF2', false, ['deriveKey'],
   )
   return crypto.subtle.deriveKey(
@@ -53,12 +66,14 @@ export async function encryptString(
   plaintext: string,
 ): Promise<{ iv: string; ciphertext: string }> {
   const ivBytes = crypto.getRandomValues(new Uint8Array(12))
+  const ivBuf = new ArrayBuffer(ivBytes.length)
+  new Uint8Array(ivBuf).set(ivBytes)
   const ctBuf = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: ivBytes },
+    { name: 'AES-GCM', iv: ivBuf },
     key,
-    enc.encode(plaintext),
+    strToBuf(plaintext),
   )
-  return { iv: bufToB64(ivBytes), ciphertext: bufToB64(ctBuf) }
+  return { iv: bufToB64(ivBuf), ciphertext: bufToB64(ctBuf) }
 }
 
 export async function decryptString(
@@ -77,7 +92,8 @@ export async function decryptString(
 // ── operações de alto nível ──────────────────────────────────────────────────
 
 export async function newSalt(): Promise<string> {
-  return bufToB64(crypto.getRandomValues(new Uint8Array(16)))
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return bytesToB64(bytes)
 }
 
 export async function buildVaultConfig(password: string): Promise<{

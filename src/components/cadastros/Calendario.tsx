@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { formatDate } from '../../lib/utils'
 
 type TipoEvento = 'projeto' | 'mensalidade' | 'reuniao' | 'evento'
+type EventSource = 'cal_event' | 'project' | 'mensalidade'
 
 interface CalEvent {
   id?: string
@@ -12,6 +13,7 @@ interface CalEvent {
   label: string
   tipo: TipoEvento
   description?: string
+  source: EventSource
 }
 
 const TIPO: Record<TipoEvento, { label: string; text: string; bg: string; dot: string; border: string }> = {
@@ -223,6 +225,8 @@ export default function Calendario() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [novoModal,   setNovoModal]   = useState(false)
   const [novoDate,    setNovoDate]    = useState<string | undefined>()
+  const [draggingId,  setDraggingId]  = useState<string | null>(null)
+  const [dragOverDay, setDragOverDay] = useState<number | null>(null)
 
   useEffect(() => { loadEvents() }, [year, month])
 
@@ -243,16 +247,17 @@ export default function Calendario() {
     const evts: CalEvent[] = []
 
     for (const p of projects ?? []) {
-      if (p.data_termino) evts.push({ date: p.data_termino, label: p.nome_projeto, tipo: 'projeto' })
+      if (p.data_termino) evts.push({ date: p.data_termino, label: p.nome_projeto, tipo: 'projeto', source: 'project' })
     }
     for (const m of mensalidades ?? []) {
       const d = String(m.dia_vencimento).padStart(2, '0')
-      evts.push({ date: `${year}-${mm}-${d}`, label: m.cliente_nome, tipo: 'mensalidade' })
+      evts.push({ date: `${year}-${mm}-${d}`, label: m.cliente_nome, tipo: 'mensalidade', source: 'mensalidade' })
     }
     for (const c of calEvts ?? []) {
       evts.push({
         id: c.id, date: c.date, time: c.time ?? undefined,
         label: c.title, tipo: c.tipo as TipoEvento, description: c.description ?? undefined,
+        source: 'cal_event',
       })
     }
 
@@ -281,6 +286,17 @@ export default function Calendario() {
   function openAdd(date?: string) {
     setNovoDate(date)
     setNovoModal(true)
+  }
+
+  async function moveEvent(eventId: string, newDay: number) {
+    const newDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(newDay).padStart(2, '0')}`
+    // Otimista: atualiza estado local
+    setEvents(es => es.map(e => e.id === eventId ? { ...e, date: newDate } : e))
+    const { error } = await supabase.from('cal_events').update({ date: newDate }).eq('id', eventId)
+    if (error) {
+      // rollback recarregando do banco
+      loadEvents()
+    }
   }
 
   return (
@@ -348,12 +364,30 @@ export default function Calendario() {
               const visible = dayEvts.slice(0, 3)
               const extra   = dayEvts.length - 3
 
+              const isDropTarget = day !== null && dragOverDay === day && draggingId !== null
               return (
                 <div key={idx}
                   onClick={() => day && setSelectedDay(day)}
-                  className={`min-h-[100px] p-1.5 border-r border-b border-white/[0.04] relative group
+                  onDragOver={day ? (e) => {
+                    if (!draggingId) return
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                    if (dragOverDay !== day) setDragOverDay(day)
+                  } : undefined}
+                  onDragLeave={day ? () => {
+                    if (dragOverDay === day) setDragOverDay(null)
+                  } : undefined}
+                  onDrop={day ? (e) => {
+                    e.preventDefault()
+                    const id = e.dataTransfer.getData('text/plain') || draggingId
+                    setDragOverDay(null)
+                    setDraggingId(null)
+                    if (id) moveEvent(id, day)
+                  } : undefined}
+                  className={`min-h-[100px] p-1.5 border-r border-b border-white/[0.04] relative group transition-all
                     ${idx % 7 === 6 ? 'border-r-0' : ''}
-                    ${day ? 'cursor-pointer hover:bg-white/[0.025] transition-colors' : 'bg-white/[0.01]'}
+                    ${day ? 'cursor-pointer hover:bg-white/[0.025]' : 'bg-white/[0.01]'}
+                    ${isDropTarget ? 'bg-indigo-500/15 ring-1 ring-inset ring-indigo-400/40' : ''}
                   `}>
                   {day && (
                     <>
@@ -371,15 +405,35 @@ export default function Calendario() {
 
                       {/* chips de evento */}
                       <div className="space-y-0.5">
-                        {visible.map((e, i) => (
-                          <div key={i}
-                            className={`px-1.5 py-0.5 rounded text-[10px] truncate font-medium leading-tight ${TIPO[e.tipo].bg} ${TIPO[e.tipo].text}`}>
-                            {e.time && (
-                              <span className="opacity-60 mr-1 font-normal">{e.time.slice(0,5)}</span>
-                            )}
-                            {e.label}
-                          </div>
-                        ))}
+                        {visible.map((e, i) => {
+                          const isDraggable = e.source === 'cal_event' && !!e.id
+                          const isBeingDragged = isDraggable && draggingId === e.id
+                          return (
+                            <div key={i}
+                              draggable={isDraggable}
+                              onDragStart={isDraggable ? (ev) => {
+                                ev.stopPropagation()
+                                ev.dataTransfer.effectAllowed = 'move'
+                                ev.dataTransfer.setData('text/plain', e.id!)
+                                setDraggingId(e.id!)
+                              } : undefined}
+                              onDragEnd={isDraggable ? () => {
+                                setDraggingId(null)
+                                setDragOverDay(null)
+                              } : undefined}
+                              onClick={isDraggable ? (ev) => ev.stopPropagation() : undefined}
+                              title={isDraggable ? 'Arraste para mover de dia' : undefined}
+                              className={`px-1.5 py-0.5 rounded text-[10px] truncate font-medium leading-tight transition-opacity
+                                ${TIPO[e.tipo].bg} ${TIPO[e.tipo].text}
+                                ${isDraggable ? 'cursor-grab active:cursor-grabbing' : ''}
+                                ${isBeingDragged ? 'opacity-40' : ''}`}>
+                              {e.time && (
+                                <span className="opacity-60 mr-1 font-normal">{e.time.slice(0,5)}</span>
+                              )}
+                              {e.label}
+                            </div>
+                          )
+                        })}
                         {extra > 0 && (
                           <p className="text-[10px] text-slate-300 px-1 leading-tight">+{extra} mais</p>
                         )}

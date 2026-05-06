@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   LogOut, Menu, LayoutGrid, FolderKanban, ChevronDown,
   Users, UserCog, CalendarDays, Receipt, RefreshCw, ArrowDownCircle, MessageCircle,
-  LayoutDashboard, AlertTriangle, Wallet, FileText, Activity, Heart,
+  LayoutDashboard, AlertTriangle, Wallet, FileText, Activity, Heart, Lock,
   type LucideIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -22,6 +22,7 @@ import Cobranca from '../components/Cobranca'
 import Propostas from '../components/Propostas'
 import FluxoCaixa from '../components/FluxoCaixa'
 import NPS from '../components/NPS'
+import Acessos from '../components/Acessos'
 import DashboardHome from '../components/DashboardHome'
 import ErrosN8n from '../components/ErrosN8n'
 import Configuracoes from '../components/Configuracoes'
@@ -53,6 +54,7 @@ const NAV: NavItem[] = [
   { type: 'leaf', id: 'dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
   { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays    },
   { type: 'leaf', id: 'nps',        label: 'NPS',         icon: Heart           },
+  { type: 'leaf', id: 'acessos',    label: 'Acessos',     icon: Lock            },
   {
     type: 'group', id: 'grp-projetos', label: 'Projetos', icon: FolderKanban,
     children: [
@@ -83,7 +85,7 @@ const NAV: NavItem[] = [
 
 const SECTION_LABELS: Record<string, string> = {
   dashboard: 'Dashboard', projetos: 'Projetos', propostas: 'Propostas', calendario: 'Calendários',
-  kanban: 'Kanban', 'erros-n8n': 'Erros N8N', nps: 'NPS',
+  kanban: 'Kanban', 'erros-n8n': 'Erros N8N', nps: 'NPS', acessos: 'Acessos',
   clientes: 'Clientes', usuarios: 'Usuários',
   'fluxo-caixa': 'Fluxo de Caixa',
   despesas: 'Despesas', mensalidades: 'Mensalidades',
@@ -352,6 +354,7 @@ export default function Dashboard() {
             {activeSection === 'propostas'    && <Propostas />}
             {activeSection === 'fluxo-caixa'  && <FluxoCaixa />}
             {activeSection === 'nps'          && <NPS />}
+            {activeSection === 'acessos'      && <Acessos />}
             {activeSection === 'cobranca'     && <Cobranca />}
             {activeSection === 'clientes'     && <Clientes readOnly={role === 'operator'} onClientCreated={role !== 'operator' ? handleClientCreated : undefined} />}
             {activeSection === 'usuarios'     && <Usuarios />}

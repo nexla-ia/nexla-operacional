@@ -180,15 +180,24 @@ export default function Despesas() {
   const [editId, setEditId]   = useState<string | null>(null)
   const [initial, setInitial] = useState<Omit<Expense, 'id'>>(EMPTY)
   const [showPagas, setShowPagas] = useState(false)
+  // Fixas pagas no mês corrente (set de expense_ids)
+  const [fixasPagasMes, setFixasPagasMes] = useState<Set<string>>(new Set())
+
+  const hoje = new Date()
+  const MES_ATUAL = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
+  const HOJE_ISO  = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`
 
   useEffect(() => { load() }, [])
 
   async function load() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('expenses').select('*').order('created_at', { ascending: false })
+    const [{ data, error }, { data: pagos }] = await Promise.all([
+      supabase.from('expenses').select('*').order('created_at', { ascending: false }),
+      supabase.from('expense_pagamentos').select('expense_id').eq('mes', MES_ATUAL),
+    ])
     if (error) setError('Erro ao carregar.')
     else if (data) setItems(data.map(fromDB))
+    setFixasPagasMes(new Set((pagos ?? []).map(p => p.expense_id as string)))
     setLoading(false)
   }
 
@@ -221,9 +230,39 @@ export default function Despesas() {
     setItems(is => is.filter(i => i.id !== id))
   }
 
-  async function togglePago(id: string, pago: boolean) {
-    setItems(is => is.map(i => i.id === id ? { ...i, pago } : i))
-    await supabase.from('expenses').update({ pago }).eq('id', id)
+  async function togglePago(item: Expense) {
+    if (item.tipo === 'fixa') {
+      // Por mês: insere/remove na tabela expense_pagamentos
+      const isPagaAgora = fixasPagasMes.has(item.id)
+      if (isPagaAgora) {
+        setFixasPagasMes(s => { const n = new Set(s); n.delete(item.id); return n })
+        const { error } = await supabase.from('expense_pagamentos').delete()
+          .eq('expense_id', item.id).eq('mes', MES_ATUAL)
+        if (error) {
+          setFixasPagasMes(s => new Set(s).add(item.id))
+          setError('Não foi possível desmarcar.')
+        }
+      } else {
+        setFixasPagasMes(s => new Set(s).add(item.id))
+        const { error } = await supabase.from('expense_pagamentos').upsert(
+          { expense_id: item.id, mes: MES_ATUAL, data_pagamento: HOJE_ISO },
+          { onConflict: 'expense_id,mes' },
+        )
+        if (error) {
+          setFixasPagasMes(s => { const n = new Set(s); n.delete(item.id); return n })
+          setError('Não foi possível registrar o pagamento.')
+        }
+      }
+    } else {
+      // Avulsa: continua sendo flag booleana (tem data própria)
+      const next = !item.pago
+      setItems(is => is.map(i => i.id === item.id ? { ...i, pago: next } : i))
+      const { error } = await supabase.from('expenses').update({ pago: next }).eq('id', item.id)
+      if (error) {
+        setItems(is => is.map(i => i.id === item.id ? { ...i, pago: !next } : i))
+        setError('Não foi possível atualizar.')
+      }
+    }
   }
 
   function openNew()       { setInitial({ ...EMPTY, tipo: tab === 'todos' ? 'avulsa' : tab }); setEditId(null); setModal(true) }
@@ -459,7 +498,10 @@ export default function Despesas() {
         </div>
       ) : (
         <div className="rounded-2xl border border-white/[0.06] overflow-hidden animate-stagger-3">
-          {filtered.map((i, idx) => (
+          {filtered.map((i, idx) => {
+            // Para fixas: pago = existe registro no mês corrente. Para avulsas: usa flag boolean.
+            const isPaga = i.tipo === 'fixa' ? fixasPagasMes.has(i.id) : i.pago
+            return (
             <div key={i.id}
               className={`group relative flex items-center gap-4 px-5 py-4 transition-all duration-150 hover:bg-white/[0.03]
                 ${idx < filtered.length - 1 ? 'border-b border-white/[0.04]' : ''}`}>
@@ -501,19 +543,24 @@ export default function Despesas() {
 
               {/* Valor */}
               <p className={`font-extrabold text-sm shrink-0 font-numeric tabular-nums
-                ${i.pago ? 'text-slate-500 line-through' : i.tipo === 'fixa' ? 'text-violet-300' : 'text-red-300'}`}>
+                ${isPaga ? 'text-slate-500 line-through' : i.tipo === 'fixa' ? 'text-violet-300' : 'text-red-300'}`}>
                 R$ {i.valor}
               </p>
 
               {/* Toggle pago */}
               <button
-                onClick={() => togglePago(i.id, !i.pago)}
+                onClick={() => togglePago(i)}
+                title={i.tipo === 'fixa'
+                  ? (isPaga ? 'Pago este mês — clique para desmarcar' : 'Marcar como pago este mês')
+                  : (isPaga ? 'Pago — clique para desmarcar' : 'Marcar como pago')}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all
-                  ${i.pago
+                  ${isPaga
                     ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
                     : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:border-white/20 hover:text-white'}`}
               >
-                {i.pago ? '✓ Pago' : 'Não pago'}
+                {isPaga
+                  ? (i.tipo === 'fixa' ? '✓ Pago este mês' : '✓ Pago')
+                  : 'Lançar pagamento'}
               </button>
 
               {/* Ações */}
@@ -528,7 +575,8 @@ export default function Despesas() {
                 </button>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

@@ -71,15 +71,17 @@ export default function DashboardHome() {
       supabase.from('mensalidades').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
     ])
 
-    // Ajustes manuais de caixa + mensalidades pagas (Cobrança)
+    // Ajustes manuais de caixa + mensalidades pagas (Cobrança) + fixas pagas (Despesas)
     const [
       { data: ajustesData },
       { data: pagamentosPagos },
       { data: mensalidadesValores },
+      { data: fixasPagamentos },
     ] = await Promise.all([
       supabase.from('ajustes_caixa').select('valor'),
       supabase.from('cobranca_pagamentos').select('client_id, mes').eq('status', 'pago'),
       supabase.from('mensalidades').select('client_id, valor'),
+      supabase.from('expense_pagamentos').select('expense_id, mes'),
     ])
 
     // Mapa client_id -> valor da mensalidade
@@ -94,18 +96,30 @@ export default function DashboardHome() {
       .filter(p => p.mes === anoMes)
       .reduce((s, p) => s + (valorByClient[p.client_id as string] ?? 0), 0)
 
-    const expenses      = [...(expensesAvulsas ?? []), ...(expensesFixas ?? [])]
+    // Mapa expense_id -> valor da despesa fixa
+    const valorByFixa: Record<string, number> = {}
+    for (const e of expensesFixas ?? []) {
+      valorByFixa[e.id as string] = Number(e.valor || 0)
+    }
+    const fixasPagasLifetime = (fixasPagamentos ?? []).reduce(
+      (s, p) => s + (valorByFixa[p.expense_id as string] ?? 0), 0
+    )
+    const fixasPagasMes = (fixasPagamentos ?? [])
+      .filter(p => p.mes === anoMes)
+      .reduce((s, p) => s + (valorByFixa[p.expense_id as string] ?? 0), 0)
+
+    // Despesas pagas no mês = avulsas pagas com data no mês + fixas com pagamento registrado no mês
+    const avulsasPagasMes = (expensesAvulsas ?? []).filter(e => e.pago).reduce((s, e) => s + (Number(e.valor) || 0), 0)
     const entradas      = (entriesMes    ?? []).reduce((s, e) => s + (e.valor ?? 0), 0) + mensalidadesPagasMes
     const pendentes     = (pendentesAll  ?? []).reduce((s, e) => s + (e.valor ?? 0), 0)
-    const despesas      = expenses.filter(e => e.pago).reduce((s, e) => s + (e.valor ?? 0), 0)
+    const despesas      = avulsasPagasMes + fixasPagasMes
     const valorProjetos = (projectsValor ?? []).reduce((s, p) => s + ((p.valor as number) ?? 0), 0)
 
-    // Saldo em caixa: entradas + mensalidades pagas − despesas pagas + ajustes manuais
-    const totalEntradasLifetime = (entriesAllRecebidas ?? []).reduce((s, e) => s + (Number(e.valor) || 0), 0)
+    // Saldo em caixa: entradas + mensalidades pagas − despesas pagas (lifetime) + ajustes manuais
+    const totalEntradasLifetime     = (entriesAllRecebidas ?? []).reduce((s, e) => s + (Number(e.valor) || 0), 0)
     const totalAvulsasPagasLifetime = (expensesAvulsasAllPagas ?? []).reduce((s, e) => s + (Number(e.valor) || 0), 0)
-    const fixasPagasMes = (expensesFixas ?? []).filter(e => e.pago).reduce((s, e) => s + (Number(e.valor) || 0), 0)
-    const totalAjustes = (ajustesData ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0)
-    const saldoCaixa = totalEntradasLifetime + mensalidadesPagasLifetime - totalAvulsasPagasLifetime - fixasPagasMes + totalAjustes
+    const totalAjustes              = (ajustesData ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0)
+    const saldoCaixa = totalEntradasLifetime + mensalidadesPagasLifetime - totalAvulsasPagasLifetime - fixasPagasLifetime + totalAjustes
 
     setStats({
       entradas, pendentes, despesas,

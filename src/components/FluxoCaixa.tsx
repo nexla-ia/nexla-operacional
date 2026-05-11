@@ -58,6 +58,7 @@ export default function FluxoCaixa() {
   const [projects, setProjects]         = useState<ProjectRow[]>([])
   const [ajustes, setAjustes]           = useState<AjusteCaixaRow[]>([])
   const [pagamentosPagos, setPagamentosPagos] = useState<{ client_id: string; mes: string; valor: number }[]>([])
+  const [fixasPagamentos, setFixasPagamentos] = useState<{ expense_id: string; mes: string; valor: number }[]>([])
   const [modalAjuste, setModalAjuste]   = useState(false)
 
   useEffect(() => { load() }, [])
@@ -73,6 +74,7 @@ export default function FluxoCaixa() {
       { data: aj,   error: e6 },
       { data: cobs, error: e7 },
       { data: mensAll },
+      { data: fixasPags },
     ] = await Promise.all([
       supabase.from('mensalidades').select('id,cliente_nome,valor,dia_vencimento,status').eq('status', 'ativo'),
       supabase.from('expenses').select('id,descricao,valor,data,tipo,dia_vencimento,pago'),
@@ -82,6 +84,7 @@ export default function FluxoCaixa() {
       supabase.from('ajustes_caixa').select('id,valor,descricao,data').order('data', { ascending: false }),
       supabase.from('cobranca_pagamentos').select('client_id, mes').eq('status', 'pago'),
       supabase.from('mensalidades').select('client_id, valor'),
+      supabase.from('expense_pagamentos').select('expense_id, mes'),
     ])
     if (e1 || e2 || e3 || e4 || e5 || e6 || e7) setError('Erro ao carregar dados financeiros.')
     setMensalidades((mens ?? []) as MensalidadeRow[])
@@ -102,6 +105,18 @@ export default function FluxoCaixa() {
       valor:     valorByClient[p.client_id] ?? 0,
     }))
     setPagamentosPagos(pagosComValor)
+
+    // Mapeia pagamentos de fixas com seu valor
+    const valorByFixa: Record<string, number> = {}
+    for (const e of (exp ?? []) as { id: string; valor: number; tipo: string }[]) {
+      if (e.tipo === 'fixa') valorByFixa[e.id] = Number(e.valor || 0)
+    }
+    const fixasPagsComValor = ((fixasPags ?? []) as { expense_id: string; mes: string }[]).map(p => ({
+      expense_id: p.expense_id,
+      mes:        p.mes,
+      valor:      valorByFixa[p.expense_id] ?? 0,
+    }))
+    setFixasPagamentos(fixasPagsComValor)
 
     setLoading(false)
   }
@@ -132,14 +147,14 @@ export default function FluxoCaixa() {
   const inicioMes = useMemo(() => new Date(hoje.getFullYear(), hoje.getMonth(), 1), [hoje])
   const fimMes    = useMemo(() => new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0), [hoje])
 
-  // Saldo em caixa lifetime — cálculo automático (inclui mensalidades pagas)
+  // Saldo em caixa lifetime — cálculo automático (inclui mensalidades + fixas pagas)
   const saldoCaixaCalculado = useMemo(() => {
-    const entradas = entries.filter(e => e.status === 'recebido').reduce((s, e) => s + Number(e.valor || 0), 0)
+    const entradas         = entries.filter(e => e.status === 'recebido').reduce((s, e) => s + Number(e.valor || 0), 0)
     const mensalidadesPagas = pagamentosPagos.reduce((s, p) => s + p.valor, 0)
-    const avulsas  = expenses.filter(e => e.tipo === 'avulsa' && e.pago).reduce((s, e) => s + Number(e.valor || 0), 0)
-    const fixasPagas = expenses.filter(e => e.tipo === 'fixa' && e.pago).reduce((s, e) => s + Number(e.valor || 0), 0)
-    return entradas + mensalidadesPagas - avulsas - fixasPagas
-  }, [entries, expenses, pagamentosPagos])
+    const avulsas          = expenses.filter(e => e.tipo === 'avulsa' && e.pago).reduce((s, e) => s + Number(e.valor || 0), 0)
+    const fixasPagasTotal  = fixasPagamentos.reduce((s, p) => s + p.valor, 0)
+    return entradas + mensalidadesPagas - avulsas - fixasPagasTotal
+  }, [entries, expenses, pagamentosPagos, fixasPagamentos])
 
   const totalAjustes = useMemo(() =>
     ajustes.reduce((s, a) => s + Number(a.valor || 0), 0)
@@ -157,12 +172,14 @@ export default function FluxoCaixa() {
     return projEntries + mensalidadesMes
   }, [entries, inicioMes, fimMes, pagamentosPagos])
 
-  const mesDespesasPagas = useMemo(() =>
-    expenses.filter(e => e.pago && (
-      (e.tipo === 'avulsa' && e.data && e.data >= toISO(inicioMes) && e.data <= toISO(fimMes)) ||
-      e.tipo === 'fixa'
-    )).reduce((s, e) => s + Number(e.valor || 0), 0)
-  , [expenses, inicioMes, fimMes])
+  const mesDespesasPagas = useMemo(() => {
+    const mesAtualKey = `${inicioMes.getFullYear()}-${String(inicioMes.getMonth() + 1).padStart(2, '0')}`
+    const avulsasMes = expenses
+      .filter(e => e.tipo === 'avulsa' && e.pago && e.data && e.data >= toISO(inicioMes) && e.data <= toISO(fimMes))
+      .reduce((s, e) => s + Number(e.valor || 0), 0)
+    const fixasMes = fixasPagamentos.filter(p => p.mes === mesAtualKey).reduce((s, p) => s + p.valor, 0)
+    return avulsasMes + fixasMes
+  }, [expenses, inicioMes, fimMes, fixasPagamentos])
 
   const saldoMes = mesEntradas - mesDespesasPagas
 

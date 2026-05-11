@@ -82,6 +82,28 @@ Para sua comodidade, segue nossa chave PIX:
 Após o pagamento, basta nos enviar o comprovante. Qualquer dúvida, estou à disposição!`
 }
 
+function buildMessageAtrasado(opts: {
+  nome: string
+  descricao: string
+  valor: number
+  dataLabel: string        // "05/05/2026"
+  diasAtraso: number
+}) {
+  const valorStr = numToMask(opts.valor)
+  const tempo = opts.diasAtraso === 1 ? '1 dia' : `${opts.diasAtraso} dias`
+  return `Olá, ${opts.nome.trim()}! Tudo bem?
+
+Passando para te lembrar de um pagamento que ficou em aberto: a ${opts.descricao} de R$ ${valorStr}, com vencimento em ${opts.dataLabel} (${tempo} atrás).
+
+Imagino que possa ter passado batido — acontece! Se já fez o pagamento, é só me enviar o comprovante que eu confirmo por aqui.
+
+Caso ainda não tenha pago, segue nossa chave PIX:
+
+🔹 CNPJ: ${PIX_CNPJ}
+
+Se precisar de mais tempo ou reagendar pra outra data, é só me falar. Qualquer dúvida estou à disposição!`
+}
+
 // ── Botão de copiar ───────────────────────────────────────────────────────────
 
 function CopyButton({ message, label = 'Copiar mensagem' }: {
@@ -309,7 +331,7 @@ export default function Cobranca() {
   const mensRows    = filtered.filter(r => r.kind === 'mensalidade') as MensalidadeRow[]
   const entradaRows = filtered.filter(r => r.kind === 'entrada')     as EntradaRow[]
 
-  // Detecta vencimentos próximos (hoje + amanhã, e ainda não pagos)
+  // Detecta vencimentos próximos (hoje + amanhã) e atrasados (vencimento já passou e não pago)
   type Iminente = {
     key: string
     quando: 'hoje' | 'amanhã'
@@ -320,7 +342,19 @@ export default function Cobranca() {
     rowRef: MensalidadeRow | EntradaRow
   }
 
+  type Atrasado = {
+    key: string
+    nome: string
+    descricao: string
+    valor: number
+    dataLabel: string
+    diasAtraso: number
+    eraPromessa: boolean
+    rowRef: MensalidadeRow | EntradaRow
+  }
+
   const iminentes: Iminente[] = []
+  const atrasados: Atrasado[] = []
 
   rows.forEach(r => {
     if (r.kind === 'mensalidade') {
@@ -329,13 +363,25 @@ export default function Cobranca() {
       const status = statuses[r.clientId] ?? 'nao_pago'
       if (status === 'pago') return
 
-      // Se há data prometida, ela substitui o vencimento original
       const promessa = promessas[r.clientId]
       const due = promessa
         ? new Date(promessa + 'T12:00:00')
         : getMensalidadeDueDate(dia, hoje)
 
-      if (isSameDay(due, hoje)) {
+      const diff = daysBetween(hoje, due)
+
+      if (diff < 0) {
+        atrasados.push({
+          key: 'm-' + r.clientId,
+          nome: r.clienteNome,
+          descricao: r.descricao,
+          valor: r.valor,
+          dataLabel: due.toLocaleDateString('pt-BR'),
+          diasAtraso: Math.abs(diff),
+          eraPromessa: !!promessa,
+          rowRef: r,
+        })
+      } else if (diff === 0) {
         iminentes.push({
           key: 'm-' + r.clientId,
           quando: 'hoje',
@@ -345,7 +391,7 @@ export default function Cobranca() {
           dataLabel: due.toLocaleDateString('pt-BR'),
           rowRef: r,
         })
-      } else if (isSameDay(due, amanha)) {
+      } else if (diff === 1) {
         iminentes.push({
           key: 'm-' + r.clientId,
           quando: 'amanhã',
@@ -361,7 +407,18 @@ export default function Cobranca() {
       if (!r.data) return
       const due = new Date(r.data + 'T12:00:00')
       const diff = daysBetween(hoje, due)
-      if (diff === 0 || diff === 1) {
+      if (diff < 0) {
+        atrasados.push({
+          key: 'e-' + r.id,
+          nome: r.nomeProjeto,
+          descricao: r.descricao || 'Cobrança',
+          valor: r.valor,
+          dataLabel: due.toLocaleDateString('pt-BR'),
+          diasAtraso: Math.abs(diff),
+          eraPromessa: false,
+          rowRef: r,
+        })
+      } else if (diff === 0 || diff === 1) {
         iminentes.push({
           key: 'e-' + r.id,
           quando: diff === 0 ? 'hoje' : 'amanhã',
@@ -375,11 +432,12 @@ export default function Cobranca() {
     }
   })
 
-  // Ordenar: hoje primeiro, depois amanhã
   iminentes.sort((a, b) => (a.quando === b.quando ? 0 : a.quando === 'hoje' ? -1 : 1))
+  atrasados.sort((a, b) => b.diasAtraso - a.diasAtraso)
 
   const venceHojeCount   = iminentes.filter(i => i.quando === 'hoje').length
   const venceAmanhaCount = iminentes.filter(i => i.quando === 'amanhã').length
+  const atrasadosCount   = atrasados.length
 
   // KPIs
   const pagosCount    = Object.values(statuses).filter(s => s === 'pago').length
@@ -421,10 +479,41 @@ export default function Cobranca() {
 
       {/* KPIs */}
       {!loading && (
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-white/[0.06] border border-white/[0.06] rounded-3xl overflow-hidden mb-8">
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.06] border border-white/[0.06] rounded-3xl overflow-hidden mb-8">
           <KpiCobranca kicker="Pagos" sub={`em ${mesNome.toLowerCase()}`} value={pagosCount} tone="emerald" />
           <KpiCobranca kicker="Não pagos" sub="aguardando pagamento" value={naoPagosCount} tone="rose" />
           <KpiCobranca kicker="Vence em breve" sub={`hoje · ${venceHojeCount} · amanhã · ${venceAmanhaCount}`} value={venceHojeCount + venceAmanhaCount} tone="amber" />
+          <KpiCobranca kicker="Em atraso" sub="vencimento já passou" value={atrasadosCount} tone="rose" />
+        </section>
+      )}
+
+      {/* Em atraso — destaque com mensagem tranquila */}
+      {!loading && atrasados.length > 0 && (
+        <section className="mb-12">
+          <div className="flex items-baseline justify-between mb-6 flex-wrap gap-3">
+            <div>
+              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-rose-300/90">
+                Em atraso · {atrasados.length}
+              </p>
+              <h2 className="font-display text-3xl text-white mt-1.5 tracking-tight"
+                  style={{ fontVariationSettings: '"opsz" 96, "SOFT" 30' }}>
+                Cobrança <span className="italic text-slate-300/80" style={{ fontVariationSettings: '"opsz" 96, "SOFT" 80' }}>gentil</span>
+              </h2>
+              <p className="text-slate-300/70 text-xs mt-1.5">
+                mensagem tranquila com lembrete e abertura pra reagendar
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-slate-300/70">PIX da empresa</p>
+              <CopyableValue value={PIX_CNPJ} label="CNPJ" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {atrasados.map(a => (
+              <AtrasadoCard key={a.key} item={a} />
+            ))}
+          </div>
         </section>
       )}
 
@@ -786,6 +875,72 @@ function CopyableValue({ value, label }: { value: string; label?: string }) {
         ? <CheckCheck className="w-3.5 h-3.5 text-emerald-300" />
         : <Copy className="w-3.5 h-3.5 text-slate-300/60 group-hover:text-white transition-colors" />}
     </button>
+  )
+}
+
+function AtrasadoCard({ item }: { item: {
+  key: string
+  nome: string
+  descricao: string
+  valor: number
+  dataLabel: string
+  diasAtraso: number
+  eraPromessa: boolean
+  rowRef: MensalidadeRow | EntradaRow
+}}) {
+  const message = buildMessageAtrasado({
+    nome:       item.nome,
+    descricao:  item.descricao,
+    valor:      item.valor,
+    dataLabel:  item.dataLabel,
+    diasAtraso: item.diasAtraso,
+  })
+  const [showPreview, setShowPreview] = useState(false)
+
+  return (
+    <div className="bg-[#0a0c11] border border-rose-500/25 ring-1 ring-rose-500/10 rounded-2xl p-6 transition-colors">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <div className="shrink-0 w-10 h-10 rounded-xl bg-rose-500/15 ring-1 ring-rose-500/25 flex items-center justify-center">
+            <AlertCircle className="w-4 h-4 text-rose-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-rose-300">
+              {item.eraPromessa ? 'prometido' : 'vencido'} em {item.dataLabel}
+              <span className="ml-2 text-rose-300/70 normal-case tracking-normal">
+                · há {item.diasAtraso === 1 ? '1 dia' : `${item.diasAtraso} dias`}
+              </span>
+            </p>
+            <h3 className="font-display text-xl text-white tracking-tight mt-1 leading-tight truncate"
+                style={{ fontVariationSettings: '"opsz" 24, "SOFT" 40' }}>
+              {item.nome}
+            </h3>
+            <p className="text-slate-300/70 text-xs mt-1 truncate">{item.descricao}</p>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="font-display text-2xl text-rose-200"
+             style={{ fontVariationSettings: '"opsz" 48, "SOFT" 30' }}>
+            <span className="text-slate-300/60 text-xs font-mono mr-1">R$</span>
+            <span className="font-numeric">{numToMask(item.valor)}</span>
+          </p>
+        </div>
+      </div>
+
+      {showPreview && (
+        <pre className="text-slate-300/85 text-xs font-mono whitespace-pre-wrap leading-relaxed bg-white/[0.02] border border-white/[0.05] rounded-xl px-4 py-3 mb-3 max-h-48 overflow-y-auto">
+{message}
+        </pre>
+      )}
+
+      <div className="flex items-center gap-2 pt-3 border-t border-white/[0.05]">
+        <CopyButton message={message} label="copiar mensagem" />
+        <button onClick={() => setShowPreview(p => !p)}
+          className="text-[11px] font-mono uppercase tracking-wider text-slate-300/70 hover:text-white px-3 py-1.5 rounded-full border border-white/[0.06] hover:border-white/15 transition-colors">
+          {showPreview ? 'ocultar' : 'ver mensagem'}
+        </button>
+      </div>
+    </div>
   )
 }
 

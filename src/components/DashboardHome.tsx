@@ -127,7 +127,7 @@ export default function DashboardHome({ role }: { role?: 'admin' | 'operator' })
     }))
 
     const mov: Movement[] = [
-      ...(entries  ?? []).slice(0,6).map(e => ({ id: e.id, tipo: 'entrada' as const, descricao: e.nome_projeto ?? '', valor: e.valor, data: e.data })),
+      ...(entries  ?? []).filter(e => e.status === 'recebido').slice(0,6).map(e => ({ id: e.id, tipo: 'entrada' as const, descricao: e.nome_projeto ?? '', valor: e.valor, data: e.data })),
       ...(expensesAvulsas ?? []).slice(0,6).map(e => ({ id: e.id, tipo: 'despesa' as const, descricao: (e.descricao as string) ?? '', valor: e.valor, data: e.data })),
     ].sort((a,b) => (b.data ?? '').localeCompare(a.data ?? '')).slice(0,8)
 

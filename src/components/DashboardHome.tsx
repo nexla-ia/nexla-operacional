@@ -20,7 +20,8 @@ interface Movement {
 const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const DAYS_PT   = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 
-export default function DashboardHome() {
+export default function DashboardHome({ role }: { role?: 'admin' | 'operator' }) {
+  const isAdmin = role === 'admin'
   const [stats,    setStats]    = useState<Stats>({ saldoCaixa:0, saldoMes:0, entradas:0, pendentes:0, despesas:0, clientes:0, projetos:0, mensalidades:0, valorProjetos:0 })
   const [recent,   setRecent]   = useState<Movement[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -28,10 +29,26 @@ export default function DashboardHome() {
   const now     = new Date()
   const dateStr = `${DAYS_PT[now.getDay()]}, ${now.getDate()} de ${MONTHS_PT[now.getMonth()]} de ${now.getFullYear()}`
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [isAdmin])
 
   async function load() {
     setLoading(true)
+
+    // Contadores operacionais — visíveis para todos
+    const [
+      { count: cClientes },
+      { count: cProjetos },
+      { count: cMens },
+    ] = await Promise.all([
+      supabase.from('clients').select('*',      { count: 'exact', head: true }),
+      supabase.from('projects').select('*',     { count: 'exact', head: true }),
+      supabase.from('mensalidades').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
+    ])
+
+    setStats(s => ({ ...s, clientes: cClientes ?? 0, projetos: cProjetos ?? 0, mensalidades: cMens ?? 0 }))
+
+    // Dados financeiros — somente admin
+    if (!isAdmin) { setLoading(false); return }
 
     const hoje        = new Date()
     const anoMes      = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
@@ -47,31 +64,17 @@ export default function DashboardHome() {
       { data: expensesAvulsasAllPagas },
       { data: expensesFixas },
       { data: projectsValor },
-      { count: cClientes },
-      { count: cProjetos },
-      { count: cMens },
     ] = await Promise.all([
-      // Lista para "Movimentações recentes" — sem filtro de mês
       supabase.from('project_entries').select('valor,status,data,nome_projeto,id').order('data', { ascending: false }).limit(20),
-      // Entradas RECEBIDAS no mês corrente — entram no saldo do mês
       supabase.from('project_entries').select('valor,data').eq('status', 'recebido').gte('data', inicioMes).lte('data', fimMes),
-      // Todas as entradas RECEBIDAS (qualquer data) — saldo em caixa lifetime
       supabase.from('project_entries').select('valor').eq('status', 'recebido'),
-      // Pendentes (a receber) — qualquer data, não entra no saldo
       supabase.from('project_entries').select('valor').eq('status', 'pendente'),
-      // Despesas avulsas do mês corrente
       supabase.from('expenses').select('valor,data,descricao,id,tipo,pago').eq('tipo', 'avulsa').gte('data', inicioMes).lte('data', fimMes),
-      // Todas as despesas avulsas pagas (qualquer data) — saldo em caixa lifetime
       supabase.from('expenses').select('valor').eq('tipo', 'avulsa').eq('pago', true),
-      // Despesas fixas (sempre todas — recorrentes)
-      supabase.from('expenses').select('valor,data,descricao,id,tipo,pago').eq('tipo', 'fixa'),
+      supabase.from('expenses').select('valor,id').eq('tipo', 'fixa'),
       supabase.from('projects').select('valor'),
-      supabase.from('clients').select('*',      { count: 'exact', head: true }),
-      supabase.from('projects').select('*',     { count: 'exact', head: true }),
-      supabase.from('mensalidades').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
     ])
 
-    // Ajustes manuais de caixa + mensalidades pagas (Cobrança) + fixas pagas (Despesas)
     const [
       { data: ajustesData },
       { data: pagamentosPagos },
@@ -84,7 +87,6 @@ export default function DashboardHome() {
       supabase.from('expense_pagamentos').select('expense_id, mes'),
     ])
 
-    // Mapa client_id -> valor da mensalidade
     const valorByClient: Record<string, number> = {}
     for (const m of mensalidadesValores ?? []) {
       if (m.client_id) valorByClient[m.client_id as string] = Number(m.valor || 0)
@@ -96,7 +98,6 @@ export default function DashboardHome() {
       .filter(p => p.mes === anoMes)
       .reduce((s, p) => s + (valorByClient[p.client_id as string] ?? 0), 0)
 
-    // Mapa expense_id -> valor da despesa fixa
     const valorByFixa: Record<string, number> = {}
     for (const e of expensesFixas ?? []) {
       valorByFixa[e.id as string] = Number(e.valor || 0)
@@ -108,28 +109,22 @@ export default function DashboardHome() {
       .filter(p => p.mes === anoMes)
       .reduce((s, p) => s + (valorByFixa[p.expense_id as string] ?? 0), 0)
 
-    // Despesas pagas no mês = avulsas pagas com data no mês + fixas com pagamento registrado no mês
     const avulsasPagasMes = (expensesAvulsas ?? []).filter(e => e.pago).reduce((s, e) => s + (Number(e.valor) || 0), 0)
     const entradas      = (entriesMes    ?? []).reduce((s, e) => s + (e.valor ?? 0), 0) + mensalidadesPagasMes
     const pendentes     = (pendentesAll  ?? []).reduce((s, e) => s + (e.valor ?? 0), 0)
     const despesas      = avulsasPagasMes + fixasPagasMes
     const valorProjetos = (projectsValor ?? []).reduce((s, p) => s + ((p.valor as number) ?? 0), 0)
-
-    // Saldo em caixa: entradas + mensalidades pagas − despesas pagas (lifetime) + ajustes manuais
     const totalEntradasLifetime     = (entriesAllRecebidas ?? []).reduce((s, e) => s + (Number(e.valor) || 0), 0)
     const totalAvulsasPagasLifetime = (expensesAvulsasAllPagas ?? []).reduce((s, e) => s + (Number(e.valor) || 0), 0)
     const totalAjustes              = (ajustesData ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0)
     const saldoCaixa = totalEntradasLifetime + mensalidadesPagasLifetime - totalAvulsasPagasLifetime - fixasPagasLifetime + totalAjustes
 
-    setStats({
+    setStats(s => ({
+      ...s,
       entradas, pendentes, despesas,
       saldoMes:   entradas - despesas,
-      saldoCaixa,
-      valorProjetos,
-      clientes:     cClientes ?? 0,
-      projetos:     cProjetos ?? 0,
-      mensalidades: cMens     ?? 0,
-    })
+      saldoCaixa, valorProjetos,
+    }))
 
     const mov: Movement[] = [
       ...(entries  ?? []).slice(0,6).map(e => ({ id: e.id, tipo: 'entrada' as const, descricao: e.nome_projeto ?? '', valor: e.valor, data: e.data })),
@@ -167,8 +162,8 @@ export default function DashboardHome() {
         </button>
       </div>
 
-      {/* ── Cards principais ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 animate-stagger-2">
+      {/* ── Cards financeiros — somente admin ── */}
+      {isAdmin && <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 animate-stagger-2">
 
         {/* Saldo — card destaque */}
         <div className={`relative overflow-hidden rounded-2xl p-6 border col-span-1
@@ -228,10 +223,10 @@ export default function DashboardHome() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
-      {/* ── Contadores ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-stagger-3">
+      {/* ── Contadores operacionais ── */}
+      <div className={`grid gap-3 animate-stagger-3 ${isAdmin ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'}`}>
         <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border bg-slate-500/8 border-slate-500/25">
           <Users className="w-4 h-4 shrink-0 text-slate-200 opacity-60" />
           <div>
@@ -248,14 +243,6 @@ export default function DashboardHome() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border bg-emerald-500/8 border-emerald-500/30 sm:col-span-1 col-span-2">
-          <DollarSign className="w-4 h-4 shrink-0 text-emerald-300 opacity-70" />
-          <div className="min-w-0">
-            <p className="text-xl font-extrabold font-numeric text-emerald-300 truncate">R$ {numToMask(stats.valorProjetos)}</p>
-            <p className="text-slate-300 text-xs font-medium">Valor em projetos</p>
-          </div>
-        </div>
-
         <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border bg-cyan-500/8 border-cyan-500/30">
           <RefreshCw className="w-4 h-4 shrink-0 text-cyan-300 opacity-60" />
           <div>
@@ -263,10 +250,20 @@ export default function DashboardHome() {
             <p className="text-slate-300 text-xs font-medium">Mensalidades</p>
           </div>
         </div>
+
+        {isAdmin && (
+          <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border bg-emerald-500/8 border-emerald-500/30">
+            <DollarSign className="w-4 h-4 shrink-0 text-emerald-300 opacity-70" />
+            <div className="min-w-0">
+              <p className="text-xl font-extrabold font-numeric text-emerald-300 truncate">R$ {numToMask(stats.valorProjetos)}</p>
+              <p className="text-slate-300 text-xs font-medium">Valor em projetos</p>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── Movimentações recentes ── */}
-      <div className="animate-stagger-4">
+      {/* ── Movimentações recentes — somente admin ── */}
+      {isAdmin && <div className="animate-stagger-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-white font-bold text-sm tracking-tight">Movimentações recentes</h2>
           <span className="text-slate-300 text-xs font-medium">{recent.length} registros</span>
@@ -299,7 +296,7 @@ export default function DashboardHome() {
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
     </div>
   )

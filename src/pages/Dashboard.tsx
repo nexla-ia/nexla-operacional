@@ -351,7 +351,7 @@ export default function Dashboard() {
             style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px)', backgroundSize: '52px 52px' }} />
 
           <div className="relative z-10 animate-fade-in-up h-full">
-            {activeSection === 'dashboard'    && <DashboardHome />}
+            {activeSection === 'dashboard'    && <DashboardHome role={role ?? undefined} />}
             {activeSection === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
             {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} pendingClient={pendingProjectClient} onPendingClientConsumed={() => setPendingProjectClient(null)} />}
             {activeSection === 'propostas'    && <Propostas />}

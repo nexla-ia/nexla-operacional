@@ -308,7 +308,7 @@ export default function Ponto() {
   const next         = nextTipo(todayPunches)
   const isDone       = next === 'done'
   const todayStr     = localDateStr()
-  const activeColor  = isDone ? C['done'] : next !== 'done' ? C[next] : C['done']
+  const activeColor  = next === 'done' ? C['done'] : C[next]
   const bm           = byTipoMap(todayPunches)
 
   const dayOfWeek = now.getDay()
@@ -533,16 +533,14 @@ export default function Ponto() {
                     </div>
 
                     {/* Next action label */}
-                    {next !== 'done' && (
-                      <div className="text-center">
-                        <p className="text-slate-600 text-[10px] font-semibold uppercase tracking-widest mb-1">
-                          Próximo registro
-                        </p>
-                        <p className="font-semibold text-sm" style={{ color: activeColor.hex }}>
-                          {TIPO_LABELS[next]}
-                        </p>
-                      </div>
-                    )}
+                    <div className="text-center">
+                      <p className="text-slate-600 text-[10px] font-semibold uppercase tracking-widest mb-1">
+                        Próximo registro
+                      </p>
+                      <p className="font-semibold text-sm" style={{ color: activeColor.hex }}>
+                        {TIPO_LABELS[next as PontoTipo]}
+                      </p>
+                    </div>
                   </>
                 )}
               </div>

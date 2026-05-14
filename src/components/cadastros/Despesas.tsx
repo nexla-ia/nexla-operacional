@@ -269,8 +269,7 @@ export default function Despesas() {
   function openEdit(i: Expense) { const { id, ...r } = i; setInitial(r); setEditId(id); setModal(true) }
 
   // Início do mês corrente (yyyy-mm-dd)
-  const hoje      = new Date()
-  const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
+  const inicioMes = `${MES_ATUAL}-01`
 
   // Avulsas pagas com data anterior ao mês corrente são "histórico" — escondidas por padrão
   const isAvulsaPagaAnterior = (i: Expense) =>

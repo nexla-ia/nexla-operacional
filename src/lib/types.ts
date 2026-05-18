@@ -36,6 +36,7 @@ export interface Client {
   cidade: string
   estado: string
   observacoes: string
+  ativo?: boolean
 }
 
 export interface Expense {

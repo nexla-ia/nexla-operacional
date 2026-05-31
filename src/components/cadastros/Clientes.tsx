@@ -512,13 +512,13 @@ export default function Clientes({ readOnly = false, onClientCreated }: { readOn
 
   async function load() {
     setLoading(true)
-    const [{ data: activeData }, { data: churnedData }, { data: eventsData }] = await Promise.all([
-      supabase.from('clients').select('*').eq('ativo', true).order('nome'),
-      supabase.from('clients').select('*').eq('ativo', false).order('nome'),
+    const [{ data: clientData }, { data: eventsData }] = await Promise.all([
+      supabase.from('clients').select('*').order('nome'),
       supabase.from('churn_events').select('*').order('data_churn', { ascending: false }),
     ])
-    setClients(activeData?.map(fromDB) ?? [])
-    setChurned(churnedData?.map(fromDB) ?? [])
+    const all = clientData?.map(fromDB) ?? []
+    setClients(all.filter(c => c.ativo !== false))
+    setChurned(all.filter(c => c.ativo === false))
     setChurnEvents(eventsData?.map(fromChurnDB) ?? [])
     setLoading(false)
   }

@@ -355,7 +355,7 @@ export default function Dashboard() {
           <div className="relative z-10 animate-fade-in-up h-full">
             {section === 'dashboard'    && <DashboardHome role={role ?? undefined} />}
             {section === 'crm'          && <CRM role={role} />}
-            {section === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
+            {section === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} role={role} />}
             {section === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} pendingClient={pendingProjectClient} onPendingClientConsumed={() => setPendingProjectClient(null)} />}
             {section === 'propostas'    && <Propostas />}
             {section === 'fluxo-caixa'  && <FluxoCaixa />}
@@ -366,7 +366,7 @@ export default function Dashboard() {
             {section === 'clientes'     && <Clientes readOnly={role === 'operator'} onClientCreated={role !== 'operator' ? handleClientCreated : undefined} />}
             {section === 'usuarios'     && <Usuarios />}
             {section === 'financeiro'   && <Financeiro />}
-            {section === 'calendario'   && <Calendario />}
+            {section === 'calendario'   && <Calendario role={role} />}
             {section === 'despesas'     && <Despesas />}
             {section === 'mensalidades' && <Mensalidades />}
             {section === 'entradas'     && <EntradasProjetos />}

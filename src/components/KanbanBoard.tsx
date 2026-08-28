@@ -24,6 +24,7 @@ interface Column {
 interface KanbanBoardProps {
   pendingTask?: { title: string; subtitle?: string; project_id?: string } | null
   onPendingTaskConsumed?: () => void
+  role?: 'admin' | 'operator' | null
 }
 
 const DEFAULT_COLS = [
@@ -65,7 +66,7 @@ interface ProjectDetail {
   descricao:      string
 }
 
-function ProjectDetailModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+function ProjectDetailModal({ projectId, hideValor, onClose }: { projectId: string; hideValor?: boolean; onClose: () => void }) {
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -124,7 +125,7 @@ function ProjectDetailModal({ projectId, onClose }: { projectId: string; onClose
                     <span className="text-white text-sm">{project.numero_cliente}</span>
                   </div>
                 )}
-                {project.valor && (
+                {project.valor && !hideValor && (
                   <div className="flex items-center gap-2.5">
                     <DollarSign className="w-4 h-4 shrink-0 text-slate-400" />
                     <span className="text-emerald-400 font-semibold text-sm">R$ {project.valor}</span>
@@ -503,7 +504,7 @@ function AddTaskForm({ onAdd, onCancel }: {
 
 // ── KanbanBoard ───────────────────────────────────────────────────────────────
 
-export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: KanbanBoardProps) {
+export default function KanbanBoard({ pendingTask, onPendingTaskConsumed, role }: KanbanBoardProps) {
   const [columns, setColumns]           = useState<Column[]>([])
   const [loading, setLoading]           = useState(true)
   const [migrationPending, setMigrationPending] = useState(false)
@@ -865,7 +866,7 @@ export default function KanbanBoard({ pendingTask, onPendingTaskConsumed }: Kanb
       </div>
 
       {selectedProjectId && (
-        <ProjectDetailModal projectId={selectedProjectId} onClose={() => setSelectedProjectId(null)} />
+        <ProjectDetailModal projectId={selectedProjectId} hideValor={role === 'operator'} onClose={() => setSelectedProjectId(null)} />
       )}
       {selectedTask && (
         <TaskDetailModal

@@ -211,7 +211,12 @@ function NovoEventoModal({ defaultDate, onCreated, onClose }: {
 
 // ── Calendário principal ──────────────────────────────────────────────────────
 
-export default function Calendario() {
+export default function Calendario({ role }: { role?: 'admin' | 'operator' | null }) {
+  // Operador não tem acesso a Projetos nem ao financeiro — o calendário dele
+  // mostra só os eventos criados à mão (reuniões e eventos).
+  const isOperator = role === 'operator'
+  const tiposVisiveis = isOperator ? TIPOS.filter(t => t === 'reuniao' || t === 'evento') : TIPOS
+
   const today = new Date()
   const [year,   setYear]   = useState(today.getFullYear())
   const [month,  setMonth]  = useState(today.getMonth())
@@ -228,7 +233,7 @@ export default function Calendario() {
   const [draggingId,  setDraggingId]  = useState<string | null>(null)
   const [dragOverDay, setDragOverDay] = useState<number | null>(null)
 
-  useEffect(() => { loadEvents() }, [year, month])
+  useEffect(() => { loadEvents() }, [year, month, isOperator])
 
   async function loadEvents() {
     setLoading(true)
@@ -237,19 +242,27 @@ export default function Calendario() {
     const start = `${year}-${mm}-01`
     const end   = `${year}-${mm}-${last}`
 
-    const [{ data: projects }, { data: mensalidades }, { data: calEvts }] = await Promise.all([
-      supabase.from('projects').select('nome_projeto,data_termino')
-        .gte('data_termino', start).lte('data_termino', end),
-      supabase.from('mensalidades').select('cliente_nome,dia_vencimento').eq('status', 'ativo'),
-      supabase.from('cal_events').select('*').gte('date', start).lte('date', end),
-    ])
+    const { data: calEvts } = await supabase.from('cal_events').select('*').gte('date', start).lte('date', end)
+
+    let projects:     { nome_projeto: string; data_termino: string }[] = []
+    let mensalidades: { cliente_nome: string; dia_vencimento: number }[] = []
+
+    if (!isOperator) {
+      const [{ data: p }, { data: m }] = await Promise.all([
+        supabase.from('projects').select('nome_projeto,data_termino')
+          .gte('data_termino', start).lte('data_termino', end),
+        supabase.from('mensalidades').select('cliente_nome,dia_vencimento').eq('status', 'ativo'),
+      ])
+      projects     = (p ?? []) as typeof projects
+      mensalidades = (m ?? []) as typeof mensalidades
+    }
 
     const evts: CalEvent[] = []
 
-    for (const p of projects ?? []) {
+    for (const p of projects) {
       if (p.data_termino) evts.push({ date: p.data_termino, label: p.nome_projeto, tipo: 'projeto', source: 'project' })
     }
-    for (const m of mensalidades ?? []) {
+    for (const m of mensalidades) {
       const d = String(m.dia_vencimento).padStart(2, '0')
       evts.push({ date: `${year}-${mm}-${d}`, label: m.cliente_nome, tipo: 'mensalidade', source: 'mensalidade' })
     }
@@ -331,7 +344,7 @@ export default function Calendario() {
 
       {/* ── Filtros ── */}
       <div className="flex items-center gap-2 mb-5 flex-wrap">
-        {TIPOS.map(t => (
+        {tiposVisiveis.map(t => (
           <button key={t} onClick={() => toggleFilter(t)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
               ${filters[t]

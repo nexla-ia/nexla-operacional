@@ -150,7 +150,7 @@ export default function Dashboard() {
         .single()
       const r = (profile?.role as 'admin' | 'operator') ?? 'operator'
       setRole(r)
-      if (r === 'operator') setActiveSection('dashboard')
+      if (r === 'operator') setActiveSection('crm')
     })
   }, [navigate])
 
@@ -162,8 +162,10 @@ export default function Dashboard() {
       document.title = 'Nexla Operacional'
   }, [unreadErrors])
 
-  // Realtime: badge + som ao chegar novo erro n8n
+  // Realtime: badge + som ao chegar novo erro n8n (só admin — o operador não vê a tela)
   useEffect(() => {
+    if (role !== 'admin') { setUnreadErrors(0); return }
+
     // contagem inicial de erros abertos
     supabase.from('n8n_errors').select('id', { count: 'exact', head: true })
       .eq('resolved', false)
@@ -180,7 +182,7 @@ export default function Dashboard() {
       .subscribe()
 
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [role])
 
   async function handleLogout() { await signOut(); navigate('/') }
 
@@ -208,30 +210,27 @@ export default function Dashboard() {
     if (id === 'erros-n8n') setUnreadErrors(0)
   }
 
-  const OPERATOR_NAV: NavItem[] = [
-    { type: 'leaf', id: 'dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
-    { type: 'leaf', id: 'crm',        label: 'CRM',         icon: Target },
+  const OPERATOR_NAV: NavLeaf[] = [
+    { type: 'leaf', id: 'crm',        label: 'CRM',         icon: Target       },
     { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays },
-    { type: 'leaf', id: 'ponto',      label: 'Ponto',       icon: Clock },
-    {
-      type: 'group', id: 'grp-projetos', label: 'Projetos', icon: FolderKanban,
-      children: [
-        { type: 'leaf', id: 'projetos',  label: 'Projetos',  icon: FolderKanban  },
-        { type: 'leaf', id: 'kanban',    label: 'Kanban',    icon: LayoutGrid    },
-        { type: 'leaf', id: 'erros-n8n', label: 'Erros N8N', icon: AlertTriangle },
-      ],
-    },
-    { type: 'leaf', id: 'clientes', label: 'Clientes',  icon: Users         },
-    { type: 'leaf', id: 'cobranca', label: 'Cobranças', icon: MessageCircle },
+    { type: 'leaf', id: 'ponto',      label: 'Ponto',       icon: Clock        },
+    { type: 'leaf', id: 'kanban',     label: 'Kanban',      icon: LayoutGrid   },
+    { type: 'leaf', id: 'clientes',   label: 'Clientes',    icon: Users        },
   ]
-  const visibleNav = role === 'operator' ? OPERATOR_NAV : NAV
+  const visibleNav: NavItem[] = role === 'operator' ? OPERATOR_NAV : NAV
+
+  // Operador só renderiza o que está no menu dele — sem isso, uma seção antiga
+  // no estado (ou um atalho interno) abriria uma tela sem acesso.
+  const section = role === 'operator' && !OPERATOR_NAV.some(i => i.id === activeSection)
+    ? 'crm'
+    : activeSection
 
   const userInitials = user?.email ? user.email.slice(0, 2).toUpperCase() : '??'
 
   const leafCls = (id: string) => `
     relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
     transition-all duration-150
-    ${activeSection === id
+    ${section === id
       ? 'nav-active bg-indigo-500/10 text-indigo-300'
       : 'text-slate-300 hover:bg-white/[0.04] hover:text-slate-200'
     }
@@ -267,7 +266,7 @@ export default function Dashboard() {
           {visibleNav.map(item => {
             if (item.type === 'leaf') {
               const Icon = item.icon
-              const isActive = activeSection === item.id
+              const isActive = section === item.id
               return (
                 <button key={item.id} onClick={() => selectLeaf(item.id)} className={leafCls(item.id)}>
                   <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors
@@ -287,7 +286,7 @@ export default function Dashboard() {
             const group = item as NavGroup
             const isOpen = openGroups.has(group.id)
             const GroupIcon = group.icon
-            const hasActive = group.children.some(c => c.id === activeSection)
+            const hasActive = group.children.some(c => c.id === section)
 
             return (
               <div key={group.id}>
@@ -305,7 +304,7 @@ export default function Dashboard() {
                   <div className="space-y-0.5">
                     {group.children.map(child => {
                       const ChildIcon = child.icon
-                      const isActive = activeSection === child.id
+                      const isActive = section === child.id
                       return (
                         <button key={child.id} onClick={() => selectLeaf(child.id)} className={leafCls(child.id)}>
                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors
@@ -344,7 +343,7 @@ export default function Dashboard() {
           <button onClick={() => setSidebarOpen(true)} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors lg:hidden">
             <Menu className="w-5 h-5" />
           </button>
-          <h2 className="text-white font-semibold text-sm tracking-tight">{SECTION_LABELS[activeSection] ?? 'Dashboard'}</h2>
+          <h2 className="text-white font-semibold text-sm tracking-tight">{SECTION_LABELS[section] ?? 'Dashboard'}</h2>
         </header>
 
         <main className="flex-1 overflow-auto p-6 relative">
@@ -354,25 +353,25 @@ export default function Dashboard() {
             style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px)', backgroundSize: '52px 52px' }} />
 
           <div className="relative z-10 animate-fade-in-up h-full">
-            {activeSection === 'dashboard'    && <DashboardHome role={role ?? undefined} />}
-            {activeSection === 'crm'          && <CRM role={role} />}
-            {activeSection === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
-            {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} pendingClient={pendingProjectClient} onPendingClientConsumed={() => setPendingProjectClient(null)} />}
-            {activeSection === 'propostas'    && <Propostas />}
-            {activeSection === 'fluxo-caixa'  && <FluxoCaixa />}
-            {activeSection === 'nps'          && <NPS />}
-            {activeSection === 'acessos'      && <Acessos />}
-            {activeSection === 'ponto'        && <Ponto />}
-            {activeSection === 'cobranca'     && <Cobranca />}
-            {activeSection === 'clientes'     && <Clientes readOnly={role === 'operator'} onClientCreated={role !== 'operator' ? handleClientCreated : undefined} />}
-            {activeSection === 'usuarios'     && <Usuarios />}
-            {activeSection === 'financeiro'   && <Financeiro />}
-            {activeSection === 'calendario'   && <Calendario />}
-            {activeSection === 'despesas'     && <Despesas />}
-            {activeSection === 'mensalidades' && <Mensalidades />}
-            {activeSection === 'entradas'     && <EntradasProjetos />}
-            {activeSection === 'erros-n8n'    && <ErrosN8n />}
-            {activeSection === 'configuracoes' && <Configuracoes />}
+            {section === 'dashboard'    && <DashboardHome role={role ?? undefined} />}
+            {section === 'crm'          && <CRM role={role} />}
+            {section === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
+            {section === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} pendingClient={pendingProjectClient} onPendingClientConsumed={() => setPendingProjectClient(null)} />}
+            {section === 'propostas'    && <Propostas />}
+            {section === 'fluxo-caixa'  && <FluxoCaixa />}
+            {section === 'nps'          && <NPS />}
+            {section === 'acessos'      && <Acessos />}
+            {section === 'ponto'        && <Ponto />}
+            {section === 'cobranca'     && <Cobranca />}
+            {section === 'clientes'     && <Clientes readOnly={role === 'operator'} onClientCreated={role !== 'operator' ? handleClientCreated : undefined} />}
+            {section === 'usuarios'     && <Usuarios />}
+            {section === 'financeiro'   && <Financeiro />}
+            {section === 'calendario'   && <Calendario />}
+            {section === 'despesas'     && <Despesas />}
+            {section === 'mensalidades' && <Mensalidades />}
+            {section === 'entradas'     && <EntradasProjetos />}
+            {section === 'erros-n8n'    && <ErrosN8n />}
+            {section === 'configuracoes' && <Configuracoes />}
           </div>
         </main>
       </div>

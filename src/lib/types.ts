@@ -85,3 +85,79 @@ export interface Proposal {
   data_envio: string
   observacoes: string
 }
+
+// ── CRM ───────────────────────────────────────────────────────────────────────
+
+export interface CrmFunnel {
+  id: string
+  nome: string
+  posicao: number
+}
+
+export interface CrmStage {
+  id: string
+  funil_id: string
+  nome: string
+  cor: string
+  posicao: number
+  alerta_dias: number | null
+  tipo: 'aberto' | 'ganho' | 'perdido'
+}
+
+export interface CrmLead {
+  id: string
+  funil_id: string | null
+  stage_id: string | null
+  nome: string
+  empresa: string | null
+  telefone: string | null
+  email: string | null
+  origem: string | null
+  temperatura: 'frio' | 'morno' | 'quente'
+  valor: number
+  valor_recorrente: number
+  tags: string[]
+  responsavel_id: string | null
+  responsavel_nome: string | null
+  observacoes: string | null
+  status: 'aberto' | 'ganho' | 'perdido'
+  motivo_perda: string | null
+  proximo_contato: string | null
+  data_ult_contato: string | null
+  data_entrada_etapa: string
+  data_fechamento: string | null
+  client_id: string | null
+  created_at: string
+}
+
+export type CrmInteractionType =
+  | 'nota' | 'ligacao' | 'whatsapp' | 'email' | 'reuniao'
+  | 'proposta' | 'etapa' | 'tarefa' | 'ganho' | 'perdido'
+
+export interface CrmInteraction {
+  id: string
+  lead_id: string
+  tipo: CrmInteractionType
+  conteudo: string | null
+  autor_nome: string | null
+  created_at: string
+}
+
+export interface CrmTask {
+  id: string
+  lead_id: string
+  titulo: string
+  descricao: string | null
+  due_date: string | null
+  concluida: boolean
+  concluida_em: string | null
+  responsavel_id: string | null
+  responsavel_nome: string | null
+  created_at: string
+}
+
+export interface CrmProfile {
+  id: string
+  full_name: string | null
+  role: 'admin' | 'operator'
+}

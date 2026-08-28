@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   LogOut, Menu, LayoutGrid, FolderKanban, ChevronDown,
   Users, UserCog, CalendarDays, Receipt, RefreshCw, ArrowDownCircle, MessageCircle,
-  LayoutDashboard, AlertTriangle, Wallet, FileText, Activity, Heart, Lock, Clock,
+  LayoutDashboard, AlertTriangle, Wallet, FileText, Activity, Heart, Lock, Clock, Target,
   type LucideIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -25,6 +25,7 @@ import NPS from '../components/NPS'
 import Acessos from '../components/Acessos'
 import Ponto from '../components/Ponto'
 import DashboardHome from '../components/DashboardHome'
+import CRM from '../components/crm/CRM'
 import ErrosN8n from '../components/ErrosN8n'
 import Configuracoes from '../components/Configuracoes'
 import type { User } from '@supabase/supabase-js'
@@ -53,6 +54,7 @@ type NavItem = NavLeaf | NavGroup
 
 const NAV: NavItem[] = [
   { type: 'leaf', id: 'dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
+  { type: 'leaf', id: 'crm',        label: 'CRM',         icon: Target          },
   { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays    },
   { type: 'leaf', id: 'ponto',      label: 'Ponto',       icon: Clock           },
   { type: 'leaf', id: 'nps',        label: 'NPS',         icon: Heart           },
@@ -86,7 +88,7 @@ const NAV: NavItem[] = [
 ]
 
 const SECTION_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard', projetos: 'Projetos', propostas: 'Propostas', calendario: 'Calendários',
+  dashboard: 'Dashboard', crm: 'CRM de Vendas', projetos: 'Projetos', propostas: 'Propostas', calendario: 'Calendários',
   kanban: 'Kanban', 'erros-n8n': 'Erros N8N', nps: 'NPS', acessos: 'Acessos', ponto: 'Ponto',
   clientes: 'Clientes', usuarios: 'Usuários',
   'fluxo-caixa': 'Fluxo de Caixa',
@@ -208,6 +210,7 @@ export default function Dashboard() {
 
   const OPERATOR_NAV: NavItem[] = [
     { type: 'leaf', id: 'dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
+    { type: 'leaf', id: 'crm',        label: 'CRM',         icon: Target },
     { type: 'leaf', id: 'calendario', label: 'Calendários', icon: CalendarDays },
     { type: 'leaf', id: 'ponto',      label: 'Ponto',       icon: Clock },
     {
@@ -352,6 +355,7 @@ export default function Dashboard() {
 
           <div className="relative z-10 animate-fade-in-up h-full">
             {activeSection === 'dashboard'    && <DashboardHome role={role ?? undefined} />}
+            {activeSection === 'crm'          && <CRM role={role} />}
             {activeSection === 'kanban'       && <KanbanBoard pendingTask={pendingKanbanTask} onPendingTaskConsumed={() => setPendingKanbanTask(null)} />}
             {activeSection === 'projetos'     && <Projects onProjectCreated={handleProjectCreated} pendingClient={pendingProjectClient} onPendingClientConsumed={() => setPendingProjectClient(null)} />}
             {activeSection === 'propostas'    && <Propostas />}

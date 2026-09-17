@@ -143,6 +143,8 @@ export interface CrmInteraction {
   created_at: string
 }
 
+export type CrmCanal = 'ligacao' | 'whatsapp' | 'email' | 'instagram' | 'reuniao' | 'outro'
+
 export interface CrmTask {
   id: string
   lead_id: string
@@ -153,7 +155,30 @@ export interface CrmTask {
   concluida_em: string | null
   responsavel_id: string | null
   responsavel_nome: string | null
+  canal: CrmCanal | null
+  cadence_id: string | null
+  step_id: string | null
+  dia_offset: number | null
   created_at: string
+}
+
+/** Régua de follow-up: sequência de toques aplicada ao lead. */
+export interface CrmCadence {
+  id: string
+  nome: string
+  descricao: string | null
+  padrao: boolean
+  created_at: string
+}
+
+export interface CrmCadenceStep {
+  id: string
+  cadence_id: string
+  posicao: number
+  dia_offset: number
+  canal: CrmCanal
+  titulo: string
+  descricao: string | null
 }
 
 export interface CrmProfile {

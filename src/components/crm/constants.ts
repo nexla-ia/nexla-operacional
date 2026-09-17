@@ -1,8 +1,8 @@
 import {
   StickyNote, PhoneCall, MessageCircle, Mail, Users, FileText,
-  ArrowRightLeft, CheckSquare, Trophy, XCircle, type LucideIcon,
+  ArrowRightLeft, CheckSquare, Trophy, XCircle, Instagram, type LucideIcon,
 } from 'lucide-react'
-import type { CrmInteractionType } from '../../lib/types'
+import type { CrmInteractionType, CrmCanal, CrmInteraction } from '../../lib/types'
 
 // ── Temperatura do lead ───────────────────────────────────────────────────────
 
@@ -47,6 +47,56 @@ export const INTERACTION_META: Record<CrmInteractionType, { label: string; Icon:
 
 /** Interações que o vendedor registra manualmente no painel do lead. */
 export const INTERACAO_MANUAL: CrmInteractionType[] = ['ligacao', 'whatsapp', 'email', 'reuniao', 'proposta', 'nota']
+
+// ── Canais de contato (usados na régua e nas tarefas) ─────────────────────────
+
+export const CANAIS: { key: CrmCanal; label: string; Icon: LucideIcon; tone: string; dot: string; hex: string }[] = [
+  { key: 'ligacao',   label: 'Ligação',   Icon: PhoneCall,     tone: 'bg-blue-500/15 text-blue-300 ring-blue-500/25',          dot: 'bg-blue-500',    hex: '#3b82f6' },
+  { key: 'whatsapp',  label: 'WhatsApp',  Icon: MessageCircle, tone: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/25', dot: 'bg-emerald-500', hex: '#10b981' },
+  { key: 'instagram', label: 'Instagram', Icon: Instagram,     tone: 'bg-pink-500/15 text-pink-300 ring-pink-500/25',          dot: 'bg-pink-500',    hex: '#ec4899' },
+  { key: 'email',     label: 'E-mail',    Icon: Mail,          tone: 'bg-sky-500/15 text-sky-300 ring-sky-500/25',             dot: 'bg-sky-500',     hex: '#0ea5e9' },
+  { key: 'reuniao',   label: 'Reunião',   Icon: Users,         tone: 'bg-violet-500/15 text-violet-300 ring-violet-500/25',    dot: 'bg-violet-500',  hex: '#8b5cf6' },
+  { key: 'outro',     label: 'Tarefa',    Icon: CheckSquare,   tone: 'bg-slate-500/15 text-slate-300 ring-slate-500/25',       dot: 'bg-slate-500',   hex: '#64748b' },
+]
+
+export function canalOf(key?: string | null) {
+  return CANAIS.find(c => c.key === key) ?? CANAIS[5]
+}
+
+/** A interação que um toque daquele canal gera no histórico do lead. */
+export const CANAL_INTERACAO: Record<CrmCanal, CrmInteraction['tipo']> = {
+  ligacao: 'ligacao', whatsapp: 'whatsapp', email: 'email',
+  instagram: 'nota', reuniao: 'reuniao', outro: 'tarefa',
+}
+
+// ── Régua padrão: 6 toques em 10 dias (modelo do comercial) ───────────────────
+// dia_offset é contado a partir da entrada do lead (0 = mesmo dia), e a UI
+// mostra como "Dia 1", "Dia 2"… que é como o time fala da régua.
+
+export const DEFAULT_CADENCE = {
+  nome: 'Régua de Prospecção',
+  descricao: '6 toques em 10 dias — ligação, WhatsApp e Instagram',
+}
+
+export const DEFAULT_CADENCE_STEPS: { posicao: number; dia_offset: number; canal: CrmCanal; titulo: string; descricao: string | null }[] = [
+  { posicao: 0, dia_offset: 0, canal: 'ligacao',   titulo: 'Ligação de apresentação',  descricao: 'Primeiro contato: entender a operação e agendar o diagnóstico.' },
+  { posicao: 1, dia_offset: 1, canal: 'whatsapp',  titulo: 'WhatsApp de follow-up',    descricao: 'Retomar a ligação e mandar material.' },
+  { posicao: 2, dia_offset: 3, canal: 'whatsapp',  titulo: 'WhatsApp — segundo toque', descricao: 'Trazer um caso parecido com o do lead.' },
+  { posicao: 3, dia_offset: 5, canal: 'instagram', titulo: 'Interação no Instagram',   descricao: 'Curtir/comentar e mandar direct.' },
+  { posicao: 4, dia_offset: 6, canal: 'ligacao',   titulo: 'Ligação — segunda tentativa', descricao: 'Tentar outro horário do dia.' },
+  { posicao: 5, dia_offset: 8, canal: 'whatsapp',  titulo: 'WhatsApp — última tentativa', descricao: 'Mensagem de encerramento: porta aberta para depois.' },
+]
+
+/** "Dia 1" é o dia de entrada do lead — offset 0. */
+export function labelDia(offset: number | null | undefined): string {
+  return `Dia ${(offset ?? 0) + 1}`
+}
+
+export function addDias(dateISO: string, n: number): string {
+  const d = new Date(`${dateISO.slice(0, 10)}T00:00:00`)
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 // ── Etapas padrão de um funil novo ────────────────────────────────────────────
 

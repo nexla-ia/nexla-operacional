@@ -1,19 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Plus, X, Search, Loader2, GripVertical, Edit2, Trash2, Target,
-  AlertTriangle, Clock, CalendarClock, Trophy, Flame, CheckSquare, Square,
-  ChevronRight, LayoutGrid, BarChart3, ListTodo, Building2, GitMerge, Wallet,
+  AlertTriangle, Clock, CalendarClock, Trophy, Flame, CheckSquare,
+  ChevronRight, LayoutGrid, BarChart3, ListTodo, Building2, GitMerge, Wallet, Repeat,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { maskBRL, parseBRL, numToMask, maskPhone } from '../../lib/utils'
-import type { CrmFunnel, CrmStage, CrmLead, CrmTask, CrmProfile, CrmInteractionType } from '../../lib/types'
+import type {
+  CrmFunnel, CrmStage, CrmLead, CrmTask, CrmProfile, CrmInteractionType,
+  CrmCadence, CrmCadenceStep,
+} from '../../lib/types'
 import {
   DEFAULT_STAGES, STAGE_COLORS, ORIGENS, MOTIVOS_PERDA, TEMPERATURAS,
+  DEFAULT_CADENCE, DEFAULT_CADENCE_STEPS, CANAL_INTERACAO, canalOf, labelDia, addDias,
   tempOf, diasDesde, diasAte, fmtBRL, fmtBRLCompact, iniciais, hojeISO, fmtDataBR,
   type Temperatura,
 } from './constants'
 import LeadPanel from './LeadPanel'
 import Desempenho from './Desempenho'
+import Agenda from './Agenda'
+import CadenciaModal from './CadenciaModal'
+import Modal from './Modal'
 
 // ── Estilos compartilhados ────────────────────────────────────────────────────
 
@@ -38,6 +45,7 @@ interface NovoLeadForm {
   responsavel_id:   string
   proximo_contato:  string
   observacoes:      string
+  cadence_id:       string
 }
 
 interface StageForm {
@@ -50,7 +58,8 @@ interface StageForm {
 
 const EMPTY_LEAD: NovoLeadForm = {
   nome: '', empresa: '', telefone: '', email: '', origem: '', temperatura: 'morno',
-  valor: '', valor_recorrente: '', stage_id: '', responsavel_id: '', proximo_contato: '', observacoes: '',
+  valor: '', valor_recorrente: '', stage_id: '', responsavel_id: '', proximo_contato: '',
+  observacoes: '', cadence_id: '',
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -64,6 +73,9 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
   const [stages, setStages]       = useState<CrmStage[]>([])
   const [leads, setLeads]         = useState<CrmLead[]>([])
   const [tasks, setTasks]         = useState<CrmTask[]>([])
+  const [cadences, setCadences]   = useState<CrmCadence[]>([])
+  const [cadenceSteps, setCadenceSteps] = useState<CrmCadenceStep[]>([])
+  const [cadenciaOk, setCadenciaOk]     = useState(true)
 
   const [activeFunnel, setActiveFunnel] = useState<string | null>(null)
   const [view, setView]           = useState<View>('board')
@@ -79,6 +91,7 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
   const [novoLead, setNovoLead]   = useState<NovoLeadForm | null>(null)
   const [stageModal, setStageModal]   = useState<StageForm | null>(null)
   const [funnelModal, setFunnelModal] = useState<{ id: string | null; nome: string } | null>(null)
+  const [cadenciaModal, setCadenciaModal] = useState(false)
   const [ganhoModal, setGanhoModal]   = useState<{ lead: CrmLead; stageId: string; valor: string; criarCliente: boolean } | null>(null)
   const [perdaModal, setPerdaModal]   = useState<{ lead: CrmLead; stageId: string; motivo: string; comentario: string } | null>(null)
   const [saving, setSaving]       = useState(false)
@@ -129,12 +142,76 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
     setLeads((ld ?? []) as CrmLead[])
     setTasks((tk ?? []) as CrmTask[])
     setActiveFunnel(cur => cur ?? fns[0]?.id ?? null)
+
+    // Réguas de follow-up (migration 038). Se ainda não foi aplicada, o CRM
+    // segue funcionando sem régua em vez de quebrar a tela inteira.
+    const [cadRes, stepRes] = await Promise.all([
+      supabase.from('crm_cadences').select('*').order('created_at'),
+      supabase.from('crm_cadence_steps').select('*').order('posicao'),
+    ])
+    setCadenciaOk(!cadRes.error)
+
+    if (!cadRes.error) {
+      let cads = (cadRes.data ?? []) as CrmCadence[]
+      let passos = (stepRes.data ?? []) as CrmCadenceStep[]
+      if (cads.length === 0) {
+        const { data: nc } = await supabase.from('crm_cadences')
+          .insert({ ...DEFAULT_CADENCE, padrao: true }).select().single()
+        if (nc) {
+          cads = [nc as CrmCadence]
+          const { data: ns } = await supabase.from('crm_cadence_steps')
+            .insert(DEFAULT_CADENCE_STEPS.map(x => ({ ...x, cadence_id: nc.id }))).select()
+          passos = (ns ?? []) as CrmCadenceStep[]
+        }
+      }
+      setCadences(cads)
+      setCadenceSteps(passos)
+    }
+
     setLoading(false)
   }
 
   async function reloadTasks() {
     const { data } = await supabase.from('crm_tasks').select('*').order('due_date', { nullsFirst: false })
     setTasks((data ?? []) as CrmTask[])
+  }
+
+  async function reloadCadencias() {
+    const [{ data: cad }, { data: st }] = await Promise.all([
+      supabase.from('crm_cadences').select('*').order('created_at'),
+      supabase.from('crm_cadence_steps').select('*').order('posicao'),
+    ])
+    setCadences((cad ?? []) as CrmCadence[])
+    setCadenceSteps((st ?? []) as CrmCadenceStep[])
+  }
+
+  /** Passos de uma régua, na ordem em que o vendedor vai executar. */
+  function passosDa(cadenceId: string) {
+    return cadenceSteps
+      .filter(s => s.cadence_id === cadenceId)
+      .sort((a, b) => a.dia_offset - b.dia_offset || a.posicao - b.posicao)
+  }
+
+  /** Cria as tarefas da régua para o lead, contando a partir de `base`. */
+  async function aplicarCadencia(lead: CrmLead, cadenceId: string, base = hojeISO()) {
+    const passos = passosDa(cadenceId)
+    if (passos.length === 0) return
+    const { error } = await supabase.from('crm_tasks').insert(passos.map(s => ({
+      lead_id:          lead.id,
+      titulo:           s.titulo,
+      descricao:        s.descricao,
+      canal:            s.canal,
+      due_date:         addDias(base, s.dia_offset),
+      cadence_id:       cadenceId,
+      step_id:          s.id,
+      dia_offset:       s.dia_offset,
+      responsavel_id:   lead.responsavel_id ?? me?.id ?? null,
+      responsavel_nome: lead.responsavel_nome ?? me?.nome ?? null,
+    })))
+    if (error) { setErro('Erro ao aplicar a régua: ' + error.message); return }
+    const nome = cadences.find(c => c.id === cadenceId)?.nome ?? 'Régua'
+    await logInteracao(lead.id, 'tarefa', `Régua "${nome}" aplicada — ${passos.length} toques agendados`)
+    await reloadTasks()
   }
 
   // ── Derivados ───────────────────────────────────────────────────────────────
@@ -343,6 +420,7 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
     const novo = data as CrmLead
     setLeads(cur => [novo, ...cur])
     await logInteracao(novo.id, 'nota', 'Lead cadastrado')
+    if (novoLead.cadence_id) await aplicarCadencia(novo, novoLead.cadence_id)
     setNovoLead(null)
     setPanelId(novo.id)
   }
@@ -354,11 +432,25 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
     reloadTasks()
   }
 
-  async function concluirTarefa(t: CrmTask) {
-    const agora = new Date().toISOString()
-    setTasks(cur => cur.map(x => (x.id === t.id ? { ...x, concluida: true, concluida_em: agora } : x)))
-    await supabase.from('crm_tasks').update({ concluida: true, concluida_em: agora }).eq('id', t.id)
-    await logInteracao(t.lead_id, 'tarefa', `Tarefa concluída: ${t.titulo}`)
+  /** Marca/desmarca o toque. Ao concluir, o canal vira interação no histórico
+      do lead — é assim que a régua alimenta o acompanhamento. */
+  async function toggleTarefa(t: CrmTask, concluida: boolean) {
+    const agora = concluida ? new Date().toISOString() : null
+    setTasks(cur => cur.map(x => (x.id === t.id ? { ...x, concluida, concluida_em: agora } : x)))
+    await supabase.from('crm_tasks').update({ concluida, concluida_em: agora }).eq('id', t.id)
+    if (!concluida) return
+    const canal = t.canal ? canalOf(t.canal) : null
+    await logInteracao(
+      t.lead_id,
+      t.canal ? CANAL_INTERACAO[t.canal] : 'tarefa',
+      canal && t.canal !== 'outro' ? `${canal.label} — ${t.titulo}` : `Tarefa concluída: ${t.titulo}`,
+    )
+    if (t.canal && t.canal !== 'outro') await patchLead(t.lead_id, { data_ult_contato: new Date().toISOString() })
+  }
+
+  async function reagendarTarefa(t: CrmTask, date: string) {
+    setTasks(cur => cur.map(x => (x.id === t.id ? { ...x, due_date: date } : x)))
+    await supabase.from('crm_tasks').update({ due_date: date }).eq('id', t.id)
   }
 
   // ── Etapas ──────────────────────────────────────────────────────────────────
@@ -490,7 +582,7 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-indigo-500/15 ring-1 ring-indigo-500/25 flex items-center justify-center">
-            <Target className="w-4.5 h-4.5 text-indigo-400" />
+            <Target className="w-4 h-4 text-indigo-400" />
           </div>
           <div className="leading-tight">
             <p className="text-white font-semibold text-sm">CRM de Vendas</p>
@@ -542,7 +634,19 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
           ))}
         </div>
 
-        <button onClick={() => setNovoLead({ ...EMPTY_LEAD, stage_id: funStages[0]?.id ?? '', responsavel_id: me?.id ?? '' })}
+        {cadenciaOk && (
+          <button onClick={() => setCadenciaModal(true)} title="Configurar as réguas de follow-up"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07] text-slate-300 text-xs font-medium hover:text-white hover:border-white/20 transition-colors">
+            <Repeat className="w-3.5 h-3.5" /> Réguas
+          </button>
+        )}
+
+        <button onClick={() => setNovoLead({
+            ...EMPTY_LEAD,
+            stage_id: funStages[0]?.id ?? '',
+            responsavel_id: me?.id ?? '',
+            cadence_id: cadences.find(c => c.padrao)?.id ?? cadences[0]?.id ?? '',
+          })}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-semibold transition-colors shadow-lg shadow-indigo-500/20">
           <Plus className="w-4 h-4" /> Novo Lead
         </button>
@@ -638,7 +742,10 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
                         onClick={() => setPanelId(lead.id)} />
                     ))}
 
-                    <button onClick={() => setNovoLead({ ...EMPTY_LEAD, stage_id: stage.id, responsavel_id: me?.id ?? '' })}
+                    <button onClick={() => setNovoLead({
+                      ...EMPTY_LEAD, stage_id: stage.id, responsavel_id: me?.id ?? '',
+                      cadence_id: cadences.find(c => c.padrao)?.id ?? cadences[0]?.id ?? '',
+                    })}
                       className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed border-white/[0.08] text-slate-500 text-[11px] hover:border-indigo-500/40 hover:text-indigo-300 transition-colors">
                       <Plus className="w-3.5 h-3.5" /> Adicionar lead
                     </button>
@@ -657,71 +764,17 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
 
       {/* ── Agenda ── */}
       {view === 'agenda' && (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="max-w-3xl mx-auto space-y-6">
-            {agendaItens.length === 0 && (
-              <EmptyState Icon={CalendarClock} titulo="Nada agendado"
-                texto="Crie tarefas de follow-up no painel do lead para elas aparecerem aqui." />
-            )}
-            {(['Atrasadas', 'Hoje', 'Próximos 7 dias', 'Depois', 'Sem data'] as const).map(bucket => {
-              const itens = agendaItens.filter(i => {
-                const d = diasAte(i.date)
-                if (bucket === 'Sem data') return d === null
-                if (d === null) return false
-                if (bucket === 'Atrasadas') return d < 0
-                if (bucket === 'Hoje') return d === 0
-                if (bucket === 'Próximos 7 dias') return d > 0 && d <= 7
-                return d > 7
-              })
-              if (itens.length === 0) return null
-              const tomBucket = bucket === 'Atrasadas' ? 'text-red-300' : bucket === 'Hoje' ? 'text-amber-300' : 'text-slate-300'
-              return (
-                <div key={bucket}>
-                  <p className={`text-[10px] font-mono uppercase tracking-[0.2em] mb-2.5 ${tomBucket}`}>{bucket} · {itens.length}</p>
-                  <div className="space-y-2">
-                    {itens.map(item => {
-                      const d = diasAte(item.date)
-                      const atrasado = d !== null && d < 0
-                      return (
-                        <div key={item.key}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-colors cursor-pointer
-                            ${atrasado ? 'bg-red-500/[0.04] border-red-500/20' : 'bg-white/[0.02] border-white/[0.07] hover:border-white/20'}`}
-                          onClick={() => setPanelId(item.lead.id)}>
-                          {item.task ? (
-                            <button onClick={e => { e.stopPropagation(); concluirTarefa(item.task!) }}
-                              title="Concluir tarefa"
-                              className="p-1 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors shrink-0">
-                              <Square className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <CalendarClock className="w-4 h-4 text-slate-500 shrink-0 ml-1" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white text-sm font-medium truncate">{item.titulo}</p>
-                            <p className="text-slate-400 text-[11px] truncate">
-                              {item.lead.nome}{item.lead.empresa ? ` · ${item.lead.empresa}` : ''}
-                              {item.descricao ? ` · ${item.descricao}` : ''}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className={`text-xs font-semibold ${atrasado ? 'text-red-300' : 'text-slate-300'}`}>
-                              {item.date ? fmtDataBR(item.date) : 'sem data'}
-                            </p>
-                            {d !== null && (
-                              <p className="text-[10px] text-slate-500">
-                                {d < 0 ? `${Math.abs(d)}d atrasado` : d === 0 ? 'hoje' : `em ${d}d`}
-                              </p>
-                            )}
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+        <div className="flex-1 min-h-0">
+          <Agenda
+            leads={leads}
+            tasks={tasks}
+            profiles={profiles}
+            meId={me?.id ?? null}
+            isAdmin={role !== 'operator'}
+            onOpenLead={setPanelId}
+            onToggleTask={toggleTarefa}
+            onReschedule={reagendarTarefa}
+          />
         </div>
       )}
 
@@ -785,7 +838,18 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
           onStageChange={pedirTrocaEtapa}
           onDelete={excluirLead}
           onTasksChanged={reloadTasks}
+          onToggleTask={toggleTarefa}
+          cadenciaOk={cadenciaOk}
+          cadences={cadences}
+          passosDa={passosDa}
+          onAplicarCadencia={aplicarCadencia}
         />
+      )}
+
+      {/* ── Modal: réguas de follow-up ── */}
+      {cadenciaModal && (
+        <CadenciaModal cadences={cadences} steps={cadenceSteps}
+          onClose={() => setCadenciaModal(false)} onChanged={reloadCadencias} />
       )}
 
       {/* ── Modal: novo lead ── */}
@@ -859,6 +923,36 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
                   onChange={e => setNovoLead({ ...novoLead, proximo_contato: e.target.value })} />
               </div>
             </div>
+            {cadenciaOk && cadences.length > 0 && (
+              <div>
+                <label className={labelCls}>Régua de follow-up</label>
+                <select className={selectCls} value={novoLead.cadence_id}
+                  onChange={e => setNovoLead({ ...novoLead, cadence_id: e.target.value })}>
+                  <option value="">Sem régua — eu crio as tarefas na mão</option>
+                  {cadences.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+                {novoLead.cadence_id && (
+                  <>
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {passosDa(novoLead.cadence_id).map(passo => {
+                        const canal = canalOf(passo.canal)
+                        return (
+                          <span key={passo.id} title={passo.titulo}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold ring-1 ${canal.tone}`}>
+                            <canal.Icon className="w-3 h-3" />
+                            {labelDia(passo.dia_offset)} · {canal.label}
+                          </span>
+                        )
+                      })}
+                    </div>
+                    <p className="text-slate-500 text-[11px] mt-2">
+                      Esses toques já entram como tarefas com data na Agenda, contando a partir de hoje.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
             <div>
               <label className={labelCls}>Observações</label>
               <textarea className={`${inputCls} resize-none`} rows={3} value={novoLead.observacoes}
@@ -1140,39 +1234,6 @@ function EmptyState({ Icon, titulo, texto }: { Icon: typeof LayoutGrid; titulo: 
       </div>
       <p className="text-white font-semibold text-sm">{titulo}</p>
       <p className="text-slate-400 text-xs max-w-xs">{texto}</p>
-    </div>
-  )
-}
-
-function Modal({ titulo, Icon, tone = 'indigo', onClose, children }: {
-  titulo:   string
-  Icon:     typeof LayoutGrid
-  tone?:    'indigo' | 'emerald' | 'red'
-  onClose:  () => void
-  children: React.ReactNode
-}) {
-  const tones = {
-    indigo:  'bg-indigo-500/15 ring-indigo-500/25 text-indigo-400',
-    emerald: 'bg-emerald-500/15 ring-emerald-500/25 text-emerald-400',
-    red:     'bg-red-500/15 ring-red-500/25 text-red-400',
-  }
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-2xl max-h-[88vh] overflow-y-auto bg-slate-900 border border-white/[0.09] rounded-3xl shadow-2xl shadow-black/60 animate-fade-in-up">
-        <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.07] sticky top-0 bg-slate-900 z-10">
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-xl ring-1 flex items-center justify-center ${tones[tone]}`}>
-              <Icon className="w-4 h-4" />
-            </div>
-            <h2 className="text-white font-semibold text-base leading-none">{titulo}</h2>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.07] transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="px-7 py-6">{children}</div>
-      </div>
     </div>
   )
 }

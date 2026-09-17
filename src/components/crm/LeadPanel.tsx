@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import {
   X, Loader2, Trash2, Phone, Mail, MessageCircle, Plus, Send, Trophy,
-  CalendarClock, Square, CheckSquare, History, Tag as TagIcon, Building2, Clock,
+  CalendarClock, Square, CheckSquare, History, Tag as TagIcon, Building2, Clock, Repeat,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { maskBRL, parseBRL, numToMask, maskPhone } from '../../lib/utils'
-import type { CrmLead, CrmStage, CrmProfile, CrmTask, CrmInteraction, CrmInteractionType } from '../../lib/types'
+import type {
+  CrmLead, CrmStage, CrmProfile, CrmTask, CrmInteraction, CrmInteractionType,
+  CrmCadence, CrmCadenceStep, CrmCanal,
+} from '../../lib/types'
 import {
-  TEMPERATURAS, ORIGENS, INTERACTION_META, INTERACAO_MANUAL,
+  TEMPERATURAS, ORIGENS, INTERACTION_META, INTERACAO_MANUAL, CANAIS, canalOf, labelDia,
   iniciais, fmtBRL, fmtDataBR, fmtDataHoraBR, relTime, waLink, soDigitos, diasDesde, diasAte,
 } from './constants'
 
@@ -26,16 +29,26 @@ interface Props {
   onStageChange:  (lead: CrmLead, stageId: string) => void
   onDelete:       (id: string) => void
   onTasksChanged: () => void
+  onToggleTask:   (task: CrmTask, concluida: boolean) => Promise<void>
+  /** false enquanto a migration 038 não roda: sem canal/régua nas tarefas. */
+  cadenciaOk:        boolean
+  cadences:          CrmCadence[]
+  passosDa:          (cadenceId: string) => CrmCadenceStep[]
+  onAplicarCadencia: (lead: CrmLead, cadenceId: string, base?: string) => Promise<void>
 }
 
-export default function LeadPanel({ lead, stages, profiles, me, onClose, onPatch, onStageChange, onDelete, onTasksChanged }: Props) {
+export default function LeadPanel({
+  lead, stages, profiles, me, onClose, onPatch, onStageChange, onDelete,
+  onTasksChanged, onToggleTask, cadenciaOk, cadences, passosDa, onAplicarCadencia,
+}: Props) {
   const [interacoes, setInteracoes] = useState<CrmInteraction[]>([])
   const [tarefas, setTarefas]       = useState<CrmTask[]>([])
   const [carregando, setCarregando] = useState(true)
   const [tipoInt, setTipoInt]       = useState<CrmInteractionType>('ligacao')
   const [textoInt, setTextoInt]     = useState('')
   const [salvandoInt, setSalvandoInt] = useState(false)
-  const [novaTarefa, setNovaTarefa] = useState<{ titulo: string; due_date: string } | null>(null)
+  const [novaTarefa, setNovaTarefa] = useState<{ titulo: string; due_date: string; canal: CrmCanal } | null>(null)
+  const [aplicando, setAplicando]   = useState(false)
   const [novaTag, setNovaTag]       = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
 
@@ -74,6 +87,7 @@ export default function LeadPanel({ lead, stages, profiles, me, onClose, onPatch
       lead_id:          lead.id,
       titulo:           novaTarefa.titulo.trim(),
       due_date:         novaTarefa.due_date || null,
+      ...(cadenciaOk ? { canal: novaTarefa.canal } : {}),
       responsavel_id:   lead.responsavel_id ?? me?.id ?? null,
       responsavel_nome: lead.responsavel_nome ?? me?.nome ?? null,
     }).select().single()
@@ -90,16 +104,16 @@ export default function LeadPanel({ lead, stages, profiles, me, onClose, onPatch
 
   async function alternarTarefa(t: CrmTask) {
     const concluida = !t.concluida
-    const agora = concluida ? new Date().toISOString() : null
-    setTarefas(cur => cur.map(x => (x.id === t.id ? { ...x, concluida, concluida_em: agora } : x)))
-    await supabase.from('crm_tasks').update({ concluida, concluida_em: agora }).eq('id', t.id)
-    if (concluida) {
-      await supabase.from('crm_interactions').insert({
-        lead_id: lead.id, tipo: 'tarefa', conteudo: `Tarefa concluída: ${t.titulo}`, autor_nome: me?.nome ?? null,
-      })
-      carregar()
-    }
-    onTasksChanged()
+    setTarefas(cur => cur.map(x => (x.id === t.id ? { ...x, concluida, concluida_em: concluida ? new Date().toISOString() : null } : x)))
+    await onToggleTask(t, concluida)
+    if (concluida) carregar()
+  }
+
+  async function aplicarRegua(cadenceId: string) {
+    setAplicando(true)
+    await onAplicarCadencia(lead, cadenceId)
+    await carregar()
+    setAplicando(false)
   }
 
   async function removerTarefa(id: string) {
@@ -116,7 +130,8 @@ export default function LeadPanel({ lead, stages, profiles, me, onClose, onPatch
   }
 
   const tel = soDigitos(lead.telefone)
-  const tarefasAbertas = tarefas.filter(t => !t.concluida)
+  const tarefasFeitas  = tarefas.filter(t => t.concluida)
+  const temRegua       = tarefas.some(t => t.cadence_id)
   const statusChip = lead.status === 'ganho'
     ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/25'
     : lead.status === 'perdido'
@@ -315,21 +330,50 @@ export default function LeadPanel({ lead, stages, profiles, me, onClose, onPatch
             )}
           </div>
 
-          {/* Tarefas */}
+          {/* Régua de follow-up / tarefas */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className={`${rotuloCls} mb-0`}>Tarefas {tarefasAbertas.length > 0 && `· ${tarefasAbertas.length} aberta(s)`}</label>
-              <button onClick={() => setNovaTarefa({ titulo: '', due_date: '' })}
+              <label className={`${rotuloCls} mb-0`}>
+                {temRegua ? 'Régua de follow-up' : 'Tarefas'}
+                {tarefas.length > 0 && ` · ${tarefasFeitas.length}/${tarefas.length} toques`}
+              </label>
+              <button onClick={() => setNovaTarefa({ titulo: '', due_date: '', canal: 'whatsapp' })}
                 className="inline-flex items-center gap-1 text-[11px] text-indigo-300 hover:text-indigo-200 transition-colors">
                 <Plus className="w-3 h-3" /> Nova
               </button>
             </div>
+
+            {tarefas.length > 0 && (
+              <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden mb-3">
+                <div className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${Math.round((tarefasFeitas.length / tarefas.length) * 100)}%` }} />
+              </div>
+            )}
+
+            {/* Aplicar uma régua quando o lead ainda não tem os toques */}
+            {!temRegua && cadences.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {cadences.map(c => (
+                  <button key={c.id} onClick={() => aplicarRegua(c.id)} disabled={aplicando}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.07] text-slate-300 text-[11px] hover:border-indigo-500/40 hover:text-indigo-200 disabled:opacity-50 transition-colors">
+                    {aplicando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Repeat className="w-3 h-3" />}
+                    Aplicar {c.nome} · {passosDa(c.id).length} toques
+                  </button>
+                ))}
+              </div>
+            )}
 
             {novaTarefa && (
               <div className="mb-2 p-3 rounded-xl bg-white/[0.03] border border-white/[0.07] space-y-2">
                 <input autoFocus value={novaTarefa.titulo} onChange={e => setNovaTarefa({ ...novaTarefa, titulo: e.target.value })}
                   placeholder="Ex.: Enviar proposta revisada" className={inputCls} />
                 <div className="flex gap-2">
+                  {cadenciaOk && (
+                    <select value={novaTarefa.canal} onChange={e => setNovaTarefa({ ...novaTarefa, canal: e.target.value as CrmCanal })}
+                      className={`${selectCls} w-[120px] shrink-0`}>
+                      {CANAIS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                    </select>
+                  )}
                   <input type="date" value={novaTarefa.due_date} onChange={e => setNovaTarefa({ ...novaTarefa, due_date: e.target.value })}
                     className={inputCls} />
                   <button onClick={criarTarefa} className="px-4 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-semibold transition-colors">
@@ -344,27 +388,43 @@ export default function LeadPanel({ lead, stages, profiles, me, onClose, onPatch
 
             <div className="space-y-1.5">
               {tarefas.length === 0 && !novaTarefa && (
-                <p className="text-slate-500 text-[11px] py-2">Nenhuma tarefa. Crie um follow-up para não perder o timing.</p>
+                <p className="text-slate-500 text-[11px] py-2">
+                  Nenhuma tarefa. Aplique uma régua acima ou crie um follow-up avulso.
+                </p>
               )}
               {tarefas.map(t => {
                 const d = diasAte(t.due_date)
                 const atrasada = !t.concluida && d !== null && d < 0
+                const canal = canalOf(t.canal)
                 return (
                   <div key={t.id} className={`group flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-colors
                     ${atrasada ? 'bg-red-500/[0.05] border-red-500/20' : 'bg-white/[0.02] border-white/[0.06]'}`}>
                     <button onClick={() => alternarTarefa(t)}
-                      className={`shrink-0 transition-colors ${t.concluida ? 'text-emerald-400' : 'text-slate-500 hover:text-emerald-400'}`}>
+                      title={t.concluida ? 'Reabrir toque' : 'Marcar como feito'}
+                      className={`shrink-0 transition-colors ${t.concluida ? 'text-emerald-400 hover:text-slate-400' : 'text-slate-500 hover:text-emerald-400'}`}>
                       {t.concluida ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                     </button>
+
+                    {cadenciaOk && (
+                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg ring-1 shrink-0 ${canal.tone}`}
+                        title={canal.label}>
+                        <canal.Icon className="w-3 h-3" />
+                      </span>
+                    )}
+
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs truncate ${t.concluida ? 'text-slate-500 line-through' : 'text-white'}`}>{t.titulo}</p>
-                      {t.due_date && (
-                        <p className={`text-[10px] ${atrasada ? 'text-red-300' : 'text-slate-500'}`}>
-                          <CalendarClock className="w-2.5 h-2.5 inline mr-1" />
-                          {fmtDataBR(t.due_date)}{atrasada ? ` · ${Math.abs(d!)}d atrasada` : ''}
-                        </p>
-                      )}
+                      <p className={`text-[10px] flex items-center gap-1.5 ${atrasada ? 'text-red-300' : 'text-slate-500'}`}>
+                        {t.dia_offset != null && <span className="text-slate-600">{labelDia(t.dia_offset)}</span>}
+                        {t.due_date && (
+                          <span className="inline-flex items-center gap-1">
+                            <CalendarClock className="w-2.5 h-2.5" />
+                            {fmtDataBR(t.due_date)}{atrasada ? ` · ${Math.abs(d!)}d atrasada` : ''}
+                          </span>
+                        )}
+                      </p>
                     </div>
+
                     <button onClick={() => removerTarefa(t.id)}
                       className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-600 hover:text-red-400 transition-all shrink-0">
                       <Trash2 className="w-3.5 h-3.5" />

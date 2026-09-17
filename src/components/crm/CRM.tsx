@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Plus, X, Search, Loader2, GripVertical, Edit2, Trash2, Target,
-  AlertTriangle, Clock, CalendarClock, Trophy, Flame, CheckSquare,
+  AlertTriangle, Clock, CalendarClock, Trophy, Flame, CheckSquare, Check,
   ChevronRight, LayoutGrid, BarChart3, ListTodo, Building2, GitMerge, Wallet, Repeat,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -194,6 +194,29 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
 
   /** Cria as tarefas da régua para o lead, contando a partir de `base`. */
   async function aplicarCadencia(lead: CrmLead, cadenceId: string, base = hojeISO()) {
+    await inserirCadencia(lead, cadenceId, base)
+    await reloadTasks()
+  }
+
+  /** Aplica a régua em vários leads de uma vez (leads criados antes da régua). */
+  async function aplicarReguaEmMassa() {
+    const cad = cadences.find(c => c.padrao) ?? cadences[0]
+    if (!cad || leadsSemRegua.length === 0) return
+    const passos = passosDa(cad.id)
+    const ok = confirm(
+      `Aplicar a régua "${cad.nome}" (${passos.length} toques) em ${leadsSemRegua.length} lead(s) sem régua?
+
+`
+      + 'As tarefas serão criadas contando a partir de hoje.',
+    )
+    if (!ok) return
+    setSaving(true)
+    for (const l of leadsSemRegua) await inserirCadencia(l, cad.id)
+    await reloadTasks()
+    setSaving(false)
+  }
+
+  async function inserirCadencia(lead: CrmLead, cadenceId: string, base = hojeISO()) {
     const passos = passosDa(cadenceId)
     if (passos.length === 0) return
     const { error } = await supabase.from('crm_tasks').insert(passos.map(s => ({
@@ -211,7 +234,6 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
     if (error) { setErro('Erro ao aplicar a régua: ' + error.message); return }
     const nome = cadences.find(c => c.id === cadenceId)?.nome ?? 'Régua'
     await logInteracao(lead.id, 'tarefa', `Régua "${nome}" aplicada — ${passos.length} toques agendados`)
-    await reloadTasks()
   }
 
   // ── Derivados ───────────────────────────────────────────────────────────────
@@ -227,13 +249,33 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
     return m
   }, [stages])
 
-  const tarefasAbertasPorLead = useMemo(() => {
+  // Tarefas soltas (fora da régua) só contam no badge do card.
+  const tarefasAvulsasPorLead = useMemo(() => {
     const m: Record<string, number> = {}
-    for (const t of tasks) if (!t.concluida) m[t.lead_id] = (m[t.lead_id] ?? 0) + 1
+    for (const t of tasks) if (!t.concluida && !t.cadence_id) m[t.lead_id] = (m[t.lead_id] ?? 0) + 1
+    return m
+  }, [tasks])
+
+  // Régua do lead, na ordem de execução — é o que vira a fileira no card.
+  const toquesPorLead = useMemo(() => {
+    const m: Record<string, CrmTask[]> = {}
+    for (const t of tasks) {
+      if (!t.cadence_id) continue
+      ;(m[t.lead_id] ??= []).push(t)
+    }
+    for (const id of Object.keys(m)) {
+      m[id].sort((a, b) =>
+        (a.dia_offset ?? 0) - (b.dia_offset ?? 0) || (a.due_date ?? '').localeCompare(b.due_date ?? ''))
+    }
     return m
   }, [tasks])
 
   const funLeads = useMemo(() => leads.filter(l => l.funil_id === activeFunnel), [leads, activeFunnel])
+
+  const leadsSemRegua = useMemo(
+    () => funLeads.filter(l => l.status === 'aberto' && !(toquesPorLead[l.id]?.length)),
+    [funLeads, toquesPorLead],
+  )
 
   const leadsFiltrados = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -673,6 +715,15 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
               <option value="sem">Sem responsável</option>
             </select>
 
+            {cadenciaOk && cadences.length > 0 && leadsSemRegua.length > 0 && (
+              <button onClick={aplicarReguaEmMassa} disabled={saving}
+                title="Cria os toques da régua padrão para os leads que ainda não têm"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-200 text-xs font-medium hover:bg-indigo-500/20 disabled:opacity-60 transition-colors">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Repeat className="w-3.5 h-3.5" />}
+                Aplicar régua em {leadsSemRegua.length} lead{leadsSemRegua.length > 1 ? 's' : ''}
+              </button>
+            )}
+
             <div className="flex-1" />
 
             <div className="flex items-center gap-4 text-xs">
@@ -735,7 +786,9 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
                     {cards.map(lead => (
                       <LeadCard key={lead.id} lead={lead} stage={stage}
                         parado={estaParado(lead)}
-                        tarefas={tarefasAbertasPorLead[lead.id] ?? 0}
+                        tarefas={tarefasAvulsasPorLead[lead.id] ?? 0}
+                        toques={toquesPorLead[lead.id] ?? []}
+                        onToggleToque={toggleTarefa}
                         arrastando={dragLead?.id === lead.id}
                         onDragStart={() => setDragLead(lead)}
                         onDragEnd={() => setDragLead(null)}
@@ -1137,15 +1190,17 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
 
 // ── Card do lead ──────────────────────────────────────────────────────────────
 
-function LeadCard({ lead, stage, parado, tarefas, arrastando, onDragStart, onDragEnd, onClick }: {
-  lead:        CrmLead
-  stage:       CrmStage
-  parado:      boolean
-  tarefas:     number
-  arrastando:  boolean
-  onDragStart: () => void
-  onDragEnd:   () => void
-  onClick:     () => void
+function LeadCard({ lead, stage, parado, tarefas, toques, onToggleToque, arrastando, onDragStart, onDragEnd, onClick }: {
+  lead:          CrmLead
+  stage:         CrmStage
+  parado:        boolean
+  tarefas:       number
+  toques:        CrmTask[]
+  onToggleToque: (t: CrmTask, concluida: boolean) => void
+  arrastando:    boolean
+  onDragStart:   () => void
+  onDragEnd:     () => void
+  onClick:       () => void
 }) {
   const temp  = tempOf(lead.temperatura)
   const dias  = diasDesde(lead.data_entrada_etapa)
@@ -1188,6 +1243,8 @@ function LeadCard({ lead, stage, parado, tarefas, arrastando, onDragStart, onDra
         </div>
       )}
 
+      {toques.length > 0 && <ReguaMini toques={toques} onToggle={onToggleToque} />}
+
       <div className="flex items-center gap-2 mt-2.5 text-[10px]">
         <span className={`inline-flex items-center gap-1 ${parado ? 'text-amber-300' : 'text-slate-500'}`}>
           {parado ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
@@ -1208,6 +1265,61 @@ function LeadCard({ lead, stage, parado, tarefas, arrastando, onDragStart, onDra
           <span className="ml-auto text-slate-500 truncate max-w-[90px]">{lead.responsavel_nome.split(' ')[0]}</span>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Régua do lead no card (o pipeline de toques, visual) ──────────────────────
+
+function ReguaMini({ toques, onToggle }: {
+  toques:   CrmTask[]
+  onToggle: (t: CrmTask, concluida: boolean) => void
+}) {
+  const feitos  = toques.filter(t => t.concluida).length
+  const proximo = toques.find(t => !t.concluida)
+  const dProx   = proximo ? diasAte(proximo.due_date) : null
+
+  const resumo = !proximo
+    ? { texto: 'régua concluída', cor: 'text-emerald-400/80' }
+    : dProx === null  ? { texto: `${canalOf(proximo.canal).label} sem data`, cor: 'text-slate-500' }
+    : dProx < 0       ? { texto: `${canalOf(proximo.canal).label} · ${Math.abs(dProx)}d atrasado`, cor: 'text-red-300' }
+    : dProx === 0     ? { texto: `${canalOf(proximo.canal).label} hoje`, cor: 'text-amber-300' }
+    : dProx === 1     ? { texto: `${canalOf(proximo.canal).label} amanhã`, cor: 'text-slate-400' }
+    :                   { texto: `${canalOf(proximo.canal).label} em ${dProx}d`, cor: 'text-slate-500' }
+
+  return (
+    <div className="flex items-center gap-2 mt-2.5">
+      <div className="flex items-center gap-1">
+        {toques.map(t => {
+          const canal    = canalOf(t.canal)
+          const d        = diasAte(t.due_date)
+          const atrasado = !t.concluida && d !== null && d < 0
+          const ehHoje   = !t.concluida && d === 0
+          const estado   = t.concluida ? 'feito' : atrasado ? 'atrasado' : ehHoje ? 'hoje' : 'pendente'
+
+          return (
+            <button key={t.id}
+              onMouseDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); onToggle(t, !t.concluida) }}
+              title={`${labelDia(t.dia_offset)} · ${canal.label} — ${t.titulo}`
+                + (t.due_date ? ` (${fmtDataBR(t.due_date)})` : '')
+                + (t.concluida ? ' · feito' : atrasado ? ` · ${Math.abs(d!)}d atrasado` : '')
+                + `
+Clique para marcar como ${t.concluida ? 'não feito' : 'feito'}`}
+              className={`w-3.5 h-3.5 rounded-[5px] border flex items-center justify-center transition-all hover:scale-125
+                ${estado === 'feito'    ? 'bg-emerald-500 border-emerald-400'
+                : estado === 'atrasado' ? 'bg-red-500/25 border-red-500'
+                : estado === 'hoje'     ? 'bg-amber-500/25 border-amber-400'
+                : 'bg-white/[0.02]'}`}
+              style={estado === 'pendente' ? { borderColor: `${canal.hex}66` } : undefined}>
+              {estado === 'feito'    && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3.5} />}
+              {estado === 'atrasado' && <span className="text-red-300 text-[8px] font-bold leading-none">!</span>}
+            </button>
+          )
+        })}
+      </div>
+      <span className="text-[10px] text-slate-500 tabular-nums shrink-0">{feitos}/{toques.length}</span>
+      <span className={`text-[10px] truncate ml-auto ${resumo.cor}`}>{resumo.texto}</span>
     </div>
   )
 }

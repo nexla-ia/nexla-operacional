@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Plus, X, Search, Loader2, GripVertical, Edit2, Trash2, Target,
   AlertTriangle, Clock, CalendarClock, Trophy, Flame, CheckSquare, Check,
-  ChevronRight, LayoutGrid, BarChart3, ListTodo, Building2, GitMerge, Wallet, Repeat,
+  ChevronRight, LayoutGrid, BarChart3, ListTodo, Building2, GitMerge, Wallet, Repeat, Table2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { maskBRL, parseBRL, numToMask, maskPhone } from '../../lib/utils'
@@ -19,6 +19,7 @@ import {
 import LeadPanel from './LeadPanel'
 import Desempenho from './Desempenho'
 import Agenda from './Agenda'
+import Pipeline from './Pipeline'
 import CadenciaModal from './CadenciaModal'
 import Modal from './Modal'
 
@@ -30,7 +31,7 @@ const inputCls = `w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/1
 const labelCls = 'block text-xs font-medium text-slate-300 mb-1.5'
 const selectCls = `${inputCls} [&>option]:bg-slate-900`
 
-type View = 'board' | 'agenda' | 'alertas' | 'desempenho'
+type View = 'board' | 'pipeline' | 'agenda' | 'alertas' | 'desempenho'
 
 interface NovoLeadForm {
   nome:             string
@@ -604,6 +605,7 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
 
   const VIEWS: { id: View; label: string; Icon: typeof LayoutGrid; badge?: number }[] = [
     { id: 'board',      label: 'Funil',      Icon: LayoutGrid },
+    { id: 'pipeline',   label: 'Pipeline',   Icon: Table2 },
     { id: 'agenda',     label: 'Agenda',     Icon: ListTodo,      badge: agendaAtrasadas },
     { id: 'alertas',    label: 'Alertas',    Icon: AlertTriangle, badge: leadsParados.length },
     { id: 'desempenho', label: 'Desempenho', Icon: BarChart3 },
@@ -813,6 +815,28 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
             </button>
           </div>
         </>
+      )}
+
+      {/* ── Pipeline (tabela de toques por lead) ── */}
+      {view === 'pipeline' && (
+        <div className="flex-1 min-h-0">
+          <Pipeline
+            leads={funLeads}
+            stages={funStages}
+            tasks={tasks}
+            profiles={profiles}
+            cadences={cadences}
+            cadenciaOk={cadenciaOk}
+            isAdmin={role !== 'operator'}
+            passosDa={passosDa}
+            onOpenLead={setPanelId}
+            onToggleTask={toggleTarefa}
+            onStageChange={pedirTrocaEtapa}
+            onPatchLead={patchLead}
+            onDeleteLead={excluirLead}
+            onAplicarCadencia={aplicarCadencia}
+          />
+        </div>
       )}
 
       {/* ── Agenda ── */}

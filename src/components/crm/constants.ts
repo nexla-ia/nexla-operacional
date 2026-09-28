@@ -92,6 +92,13 @@ export function labelDia(offset: number | null | undefined): string {
   return `Dia ${(offset ?? 0) + 1}`
 }
 
+/** Dias entre duas datas (positivo quando `para` é depois de `de`). */
+export function diffDias(de: string, para: string): number {
+  const a = new Date(`${de.slice(0, 10)}T00:00:00`).getTime()
+  const b = new Date(`${para.slice(0, 10)}T00:00:00`).getTime()
+  return Math.round((b - a) / 86_400_000)
+}
+
 export function addDias(dateISO: string, n: number): string {
   const d = new Date(`${dateISO.slice(0, 10)}T00:00:00`)
   d.setDate(d.getDate() + n)

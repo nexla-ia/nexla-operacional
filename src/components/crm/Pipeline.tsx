@@ -5,7 +5,8 @@ import {
 } from 'lucide-react'
 import type { CrmLead, CrmStage, CrmTask, CrmProfile, CrmCadence, CrmCadenceStep } from '../../lib/types'
 import {
-  canalOf, labelDia, diasDesde, diasAte, fmtDataBR, fmtBRLCompact, iniciais, tempOf, ORIGENS,
+  canalOf, labelDia, diasDesde, diasAte, fmtDataBR, fmtBRLCompact, iniciais, tempOf,
+  addDias, hojeISO, ORIGENS,
 } from './constants'
 
 const inputCls = `px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07] text-white text-xs
@@ -26,6 +27,9 @@ interface Props {
   passosDa:          (cadenceId: string) => CrmCadenceStep[]
   onOpenLead:        (leadId: string) => void
   onToggleTask:      (task: CrmTask, concluida: boolean) => void
+  onReschedule:      (task: CrmTask, date: string, cascata?: boolean) => void
+  /** Quantos toques pendentes da régua vêm depois deste (para o aviso do adiamento). */
+  toquesSeguintes:   (task: CrmTask) => CrmTask[]
   onStageChange:     (lead: CrmLead, stageId: string) => void
   onPatchLead:       (id: string, changes: Partial<CrmLead>) => Promise<void>
   onDeleteLead:      (id: string) => void
@@ -34,7 +38,8 @@ interface Props {
 
 export default function Pipeline({
   leads, stages, tasks, profiles, cadences, cadenciaOk, isAdmin, passosDa,
-  onOpenLead, onToggleTask, onStageChange, onPatchLead, onDeleteLead, onAplicarCadencia,
+  onOpenLead, onToggleTask, onReschedule, toquesSeguintes, onStageChange,
+  onPatchLead, onDeleteLead, onAplicarCadencia,
 }: Props) {
   const [aba, setAba]           = useState<Aba>('aberto')
   const [busca, setBusca]       = useState('')
@@ -44,6 +49,8 @@ export default function Pipeline({
   const [reguaId, setReguaId]   = useState(cadences.find(c => c.padrao)?.id ?? cadences[0]?.id ?? '')
   const [expandido, setExpandido] = useState<string | null>(null)
   const [aplicando, setAplicando] = useState<string | null>(null)
+  const [adiando, setAdiando]   = useState<{ task: CrmTask; x: number; y: number } | null>(null)
+  const [empurrar, setEmpurrar] = useState(true)   // adiar arrasta os toques seguintes junto
 
   const passos = reguaId ? passosDa(reguaId) : []
 
@@ -288,9 +295,21 @@ export default function Pipeline({
                             <span className="text-slate-700">—</span>
                           ) : (
                             <>
-                              <span className="block text-[10px] text-slate-500 mb-1 tabular-nums">
-                                {t.due_date ? fmtDataBR(t.due_date).slice(0, 5) : '--'}
-                              </span>
+                              {t.concluida || !t.due_date ? (
+                                <span className="block text-[10px] text-slate-500 mb-1 tabular-nums">
+                                  {t.due_date ? fmtDataBR(t.due_date).slice(0, 5) : '--'}
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={e => {
+                                    const r = e.currentTarget.getBoundingClientRect()
+                                    setAdiando(cur => cur?.task.id === t.id ? null : { task: t, x: r.left, y: r.bottom + 6 })
+                                  }}
+                                  title="Adiar este toque"
+                                  className="block mx-auto mb-1 px-1 rounded text-[10px] text-slate-500 tabular-nums hover:text-indigo-300 hover:bg-white/[0.06] transition-colors">
+                                  {fmtDataBR(t.due_date).slice(0, 5)}
+                                </button>
+                              )}
                               <Caixinha task={t} onToggle={onToggleTask} />
                             </>
                           )}
@@ -380,13 +399,69 @@ export default function Pipeline({
         </table>
       </div>
 
+      {/* ── Adiar toque (e arrastar a régua junto) ── */}
+      {adiando && (() => {
+        const t         = adiando.task
+        const seguintes = toquesSeguintes(t)
+        const largura   = 252
+        const left      = Math.max(8, Math.min(adiando.x, window.innerWidth - largura - 8))
+        const top       = Math.max(8, Math.min(adiando.y, window.innerHeight - 250))
+        const canal     = canalOf(t.canal)
+
+        const adiar = (dias: number) => {
+          onReschedule(t, addDias(t.due_date ?? hojeISO(), dias), empurrar && seguintes.length > 0)
+          setAdiando(null)
+        }
+
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setAdiando(null)} />
+            <div className="fixed z-50 rounded-2xl border border-white/[0.09] bg-slate-900 shadow-2xl shadow-black/60 p-3"
+              style={{ left, top, width: largura }}>
+              <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-500 mb-1">Adiar toque</p>
+              <p className="text-white text-xs font-medium truncate mb-3">{canal.label} — {t.titulo}</p>
+
+              <div className="grid grid-cols-3 gap-1.5">
+                {[1, 3, 7].map(n => (
+                  <button key={n} onClick={() => adiar(n)}
+                    className="py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-200 text-xs font-semibold hover:bg-indigo-500/15 hover:border-indigo-500/30 hover:text-indigo-200 transition-colors">
+                    +{n}d
+                  </button>
+                ))}
+              </div>
+
+              <input type="date" defaultValue={t.due_date?.slice(0, 10) ?? ''}
+                onChange={e => {
+                  if (!e.target.value) return
+                  onReschedule(t, e.target.value, empurrar && seguintes.length > 0)
+                  setAdiando(null)
+                }}
+                className="w-full mt-2 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.07] text-white text-xs focus:outline-none focus:border-indigo-500/40" />
+
+              <label className={`flex items-start gap-2 mt-3 ${seguintes.length ? 'cursor-pointer' : 'opacity-50'}`}>
+                <input type="checkbox" checked={empurrar && seguintes.length > 0} disabled={seguintes.length === 0}
+                  onChange={e => setEmpurrar(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-indigo-500 mt-0.5 shrink-0" />
+                <span className="text-slate-300 text-[11px] leading-snug">
+                  {seguintes.length > 0
+                    ? <>Empurrar os {seguintes.length} toques seguintes
+                        <span className="block text-slate-500 text-[10px]">a régua inteira anda o mesmo tanto de dias</span></>
+                    : <>Sem toques depois deste
+                        <span className="block text-slate-500 text-[10px]">só esta data muda</span></>}
+                </span>
+              </label>
+            </div>
+          </>
+        )
+      })()}
+
       {/* ── Legenda ── */}
       <div className="flex items-center gap-5 text-[11px] text-slate-500 flex-wrap">
         <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px] bg-emerald-500" /> toque feito</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px] bg-red-500/25 border border-red-500" /> atrasado</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px] bg-amber-500/25 border border-amber-400" /> para hoje</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px] border border-white/20" /> pendente, no prazo</span>
-        <span className="ml-auto">clique no quadrado para marcar o toque</span>
+        <span className="ml-auto">clique no quadrado para marcar · clique na data para adiar</span>
       </div>
     </div>
   )

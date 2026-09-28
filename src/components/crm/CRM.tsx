@@ -12,7 +12,7 @@ import type {
 } from '../../lib/types'
 import {
   DEFAULT_STAGES, STAGE_COLORS, ORIGENS, MOTIVOS_PERDA, TEMPERATURAS,
-  DEFAULT_CADENCE, DEFAULT_CADENCE_STEPS, CANAL_INTERACAO, canalOf, labelDia, addDias,
+  DEFAULT_CADENCE, DEFAULT_CADENCE_STEPS, CANAL_INTERACAO, canalOf, labelDia, addDias, diffDias,
   tempOf, diasDesde, diasAte, fmtBRL, fmtBRLCompact, iniciais, hojeISO, fmtDataBR,
   type Temperatura,
 } from './constants'
@@ -491,9 +491,39 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
     if (t.canal && t.canal !== 'outro') await patchLead(t.lead_id, { data_ult_contato: new Date().toISOString() })
   }
 
-  async function reagendarTarefa(t: CrmTask, date: string) {
-    setTasks(cur => cur.map(x => (x.id === t.id ? { ...x, due_date: date } : x)))
-    await supabase.from('crm_tasks').update({ due_date: date }).eq('id', t.id)
+  /** Toques pendentes da mesma régua que vêm DEPOIS deste — os que escorregam
+      junto quando o vendedor adia um toque. */
+  function toquesSeguintes(t: CrmTask): CrmTask[] {
+    if (!t.cadence_id || !t.due_date) return []
+    return tasks.filter(s =>
+      s.id !== t.id
+      && !s.concluida
+      && s.lead_id === t.lead_id
+      && s.cadence_id === t.cadence_id
+      && !!s.due_date
+      && (s.due_date > t.due_date!
+        || (s.due_date === t.due_date && (s.dia_offset ?? 0) > (t.dia_offset ?? 0))),
+    )
+  }
+
+  /** Reagenda um toque. Com `cascata`, os toques seguintes da régua andam o
+      mesmo número de dias — adiar o de hoje empurra a sequência inteira. */
+  async function reagendarTarefa(t: CrmTask, date: string, cascata = false) {
+    const delta = t.due_date ? diffDias(t.due_date, date) : 0
+    const mudancas: { id: string; due_date: string }[] = [{ id: t.id, due_date: date }]
+
+    if (cascata && delta !== 0) {
+      for (const s of toquesSeguintes(t)) {
+        mudancas.push({ id: s.id, due_date: addDias(s.due_date!, delta) })
+      }
+    }
+
+    setTasks(cur => cur.map(x => {
+      const m = mudancas.find(c => c.id === x.id)
+      return m ? { ...x, due_date: m.due_date } : x
+    }))
+    await Promise.all(mudancas.map(m =>
+      supabase.from('crm_tasks').update({ due_date: m.due_date }).eq('id', m.id)))
   }
 
   // ── Etapas ──────────────────────────────────────────────────────────────────
@@ -831,6 +861,8 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
             passosDa={passosDa}
             onOpenLead={setPanelId}
             onToggleTask={toggleTarefa}
+            onReschedule={reagendarTarefa}
+            toquesSeguintes={toquesSeguintes}
             onStageChange={pedirTrocaEtapa}
             onPatchLead={patchLead}
             onDeleteLead={excluirLead}

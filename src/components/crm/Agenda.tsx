@@ -25,7 +25,7 @@ interface Props {
   isAdmin:      boolean
   onOpenLead:   (leadId: string) => void
   onToggleTask: (task: CrmTask, concluida: boolean) => void
-  onReschedule: (task: CrmTask, date: string) => void
+  onReschedule: (task: CrmTask, date: string, cascata?: boolean) => void
 }
 
 const DIAS_SEMANA = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
@@ -302,7 +302,7 @@ function LinhaAgenda({ item, hoje, onOpenLead, onToggleTask, onReschedule }: {
   hoje:         string
   onOpenLead:   (id: string) => void
   onToggleTask: (t: CrmTask, concluida: boolean) => void
-  onReschedule: (t: CrmTask, date: string) => void
+  onReschedule: (t: CrmTask, date: string, cascata?: boolean) => void
 }) {
   const canal    = canalOf(item.canal)
   const d        = diasAte(item.date)
@@ -362,8 +362,8 @@ function LinhaAgenda({ item, hoje, onOpenLead, onToggleTask, onReschedule }: {
           </>
         )}
         {item.task && !feita && (
-          <button onClick={e => { e.stopPropagation(); onReschedule(item.task!, addDias(item.date && item.date > hoje ? item.date : hoje, 1)) }}
-            title="Adiar 1 dia"
+          <button onClick={e => { e.stopPropagation(); onReschedule(item.task!, addDias(item.date && item.date > hoje ? item.date : hoje, 1), true) }}
+            title="Adiar 1 dia (empurra os toques seguintes da régua)"
             className="p-1.5 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors">
             <CalendarPlus className="w-3.5 h-3.5" />
           </button>

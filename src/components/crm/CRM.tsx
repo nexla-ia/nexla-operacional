@@ -3,6 +3,7 @@ import {
   Plus, X, Search, Loader2, GripVertical, Edit2, Trash2, Target,
   AlertTriangle, Clock, CalendarClock, Trophy, Flame, CheckSquare, Check,
   ChevronRight, LayoutGrid, BarChart3, ListTodo, Building2, GitMerge, Wallet, Repeat, Table2,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { maskBRL, parseBRL, numToMask, maskPhone } from '../../lib/utils'
@@ -21,6 +22,7 @@ import Desempenho from './Desempenho'
 import Agenda from './Agenda'
 import Pipeline from './Pipeline'
 import CadenciaModal from './CadenciaModal'
+import ImportarModal from './ImportarModal'
 import Modal from './Modal'
 
 // ── Estilos compartilhados ────────────────────────────────────────────────────
@@ -93,6 +95,7 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
   const [stageModal, setStageModal]   = useState<StageForm | null>(null)
   const [funnelModal, setFunnelModal] = useState<{ id: string | null; nome: string } | null>(null)
   const [cadenciaModal, setCadenciaModal] = useState(false)
+  const [importarModal, setImportarModal] = useState(false)
   const [ganhoModal, setGanhoModal]   = useState<{ lead: CrmLead; stageId: string; valor: string; criarCliente: boolean } | null>(null)
   const [perdaModal, setPerdaModal]   = useState<{ lead: CrmLead; stageId: string; motivo: string; comentario: string } | null>(null)
   const [saving, setSaving]       = useState(false)
@@ -508,6 +511,35 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
 
   /** Reagenda um toque. Com `cascata`, os toques seguintes da régua andam o
       mesmo número de dias — adiar o de hoje empurra a sequência inteira. */
+  /** Cria os toques da régua para vários leads de uma vez (usado na importação). */
+  async function aplicarCadenciaEmLote(novos: CrmLead[], cadenceId: string) {
+    const passos = passosDa(cadenceId)
+    if (passos.length === 0 || novos.length === 0) return
+    const base = hojeISO()
+    const linhas = novos.flatMap(lead => passos.map(s => ({
+      lead_id:          lead.id,
+      titulo:           s.titulo,
+      descricao:        s.descricao,
+      canal:            s.canal,
+      due_date:         addDias(base, s.dia_offset),
+      cadence_id:       cadenceId,
+      step_id:          s.id,
+      dia_offset:       s.dia_offset,
+      responsavel_id:   lead.responsavel_id ?? me?.id ?? null,
+      responsavel_nome: lead.responsavel_nome ?? me?.nome ?? null,
+    })))
+    for (let i = 0; i < linhas.length; i += 200) {
+      const { error } = await supabase.from('crm_tasks').insert(linhas.slice(i, i + 200))
+      if (error) { setErro('Leads importados, mas a régua falhou: ' + error.message); return }
+    }
+  }
+
+  async function aoImportarLeads(novos: CrmLead[], cadenceId: string) {
+    setLeads(cur => [...novos, ...cur])
+    if (cadenceId) await aplicarCadenciaEmLote(novos, cadenceId)
+    await reloadTasks()
+  }
+
   async function reagendarTarefa(t: CrmTask, date: string, cascata = false) {
     const delta = t.due_date ? diffDias(t.due_date, date) : 0
     const mudancas: { id: string; due_date: string }[] = [{ id: t.id, due_date: date }]
@@ -707,6 +739,11 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
             </button>
           ))}
         </div>
+
+        <button onClick={() => setImportarModal(true)} title="Importar leads de uma planilha"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07] text-slate-300 text-xs font-medium hover:text-white hover:border-white/20 transition-colors">
+          <FileSpreadsheet className="w-3.5 h-3.5" /> Importar
+        </button>
 
         {cadenciaOk && (
           <button onClick={() => setCadenciaModal(true)} title="Configurar as réguas de follow-up"
@@ -959,6 +996,20 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
       {cadenciaModal && (
         <CadenciaModal cadences={cadences} steps={cadenceSteps}
           onClose={() => setCadenciaModal(false)} onChanged={reloadCadencias} />
+      )}
+
+      {/* ── Modal: importar planilha ── */}
+      {importarModal && (
+        <ImportarModal
+          funilId={activeFunnel}
+          stages={funStages}
+          profiles={profiles}
+          cadences={cadenciaOk ? cadences : []}
+          leads={leads}
+          me={me}
+          onClose={() => setImportarModal(false)}
+          onImported={aoImportarLeads}
+        />
       )}
 
       {/* ── Modal: novo lead ── */}

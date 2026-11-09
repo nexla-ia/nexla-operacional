@@ -132,6 +132,8 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [user, setUser]                   = useState<User | null>(null)
   const [role, setRole]                   = useState<'admin' | 'operator' | null>(null)
+  const [profileName, setProfileName]     = useState('')
+  const [avatarFailed, setAvatarFailed]   = useState(false)
   const [activeSection, setActiveSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen]     = useState(false)
   const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set())
@@ -145,12 +147,13 @@ export default function Dashboard() {
       setUser(data.user)
       const { data: profile } = await supabase
         .from('nexla_profiles')
-        .select('role')
+        .select('role, full_name')
         .eq('id', data.user.id)
         .maybeSingle()
       // Conta de outro sistema (auth compartilhado) sem cadastro na Nexla: expulsa.
       if (!profile) { await signOut(); navigate('/', { replace: true }); return }
       const r = profile.role as 'admin' | 'operator'
+      setProfileName((profile.full_name as string | null)?.trim() ?? '')
       setRole(r)
       if (r === 'operator') setActiveSection('crm')
     })
@@ -227,7 +230,15 @@ export default function Dashboard() {
     ? 'crm'
     : activeSection
 
-  const userInitials = user?.email ? user.email.slice(0, 2).toUpperCase() : '??'
+  // Nome e foto: perfil da Nexla primeiro, depois os metadados da conta
+  // (login com Google traz full_name/name e avatar_url/picture).
+  const meta        = (user?.user_metadata ?? {}) as Record<string, unknown>
+  const metaStr     = (k: string) => (typeof meta[k] === 'string' ? (meta[k] as string).trim() : '')
+  const displayName = profileName || metaStr('full_name') || metaStr('name')
+  const avatarUrl   = metaStr('avatar_url') || metaStr('picture')
+  const userInitials = displayName
+    ? displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
+    : user?.email ? user.email.slice(0, 2).toUpperCase() : '??'
 
   const leafCls = (id: string) => `
     relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
@@ -337,10 +348,27 @@ export default function Dashboard() {
         {/* User / Logout */}
         <div className="px-2.5 py-4 border-t border-white/[0.05]">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-1">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500/30 to-violet-500/20 ring-1 ring-indigo-500/20 flex items-center justify-center shrink-0">
-              <span className="text-indigo-200 text-[10px] font-bold">{userInitials}</span>
+            {avatarUrl && !avatarFailed ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                referrerPolicy="no-referrer"
+                onError={() => setAvatarFailed(true)}
+                className="w-7 h-7 rounded-lg object-cover ring-1 ring-indigo-500/20 shrink-0"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500/30 to-violet-500/20 ring-1 ring-indigo-500/20 flex items-center justify-center shrink-0">
+                <span className="text-indigo-200 text-[10px] font-bold">{userInitials}</span>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              {displayName && (
+                <p className="text-slate-200 text-xs font-medium truncate">{displayName}</p>
+              )}
+              <p className={`truncate ${displayName ? 'text-slate-500 text-[10px]' : 'text-slate-300 text-xs font-medium'}`}>
+                {user?.email}
+              </p>
             </div>
-            <span className="text-slate-300 text-xs truncate flex-1 font-medium">{user?.email}</span>
           </div>
           <button onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-red-500/8 hover:text-red-400 transition-all duration-150">

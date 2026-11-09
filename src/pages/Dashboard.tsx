@@ -144,7 +144,7 @@ export default function Dashboard() {
       if (!data.user) { navigate('/'); return }
       setUser(data.user)
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('nexla_profiles')
         .select('role')
         .eq('id', data.user.id)
         .single()

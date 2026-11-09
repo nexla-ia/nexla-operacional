@@ -221,7 +221,7 @@ export default function Ponto() {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
       setUserId(data.user.id)
-      const { data: p } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
+      const { data: p } = await supabase.from('nexla_profiles').select('role').eq('id', data.user.id).single()
       setRole((p?.role as 'admin' | 'operator') ?? 'operator')
     })
   }, [])
@@ -254,7 +254,7 @@ export default function Ponto() {
 
   useEffect(() => {
     if (role !== 'admin') return
-    supabase.from('profiles').select('id,full_name').then(({ data }) => {
+    supabase.from('nexla_profiles').select('id,full_name').then(({ data }) => {
       const ps = (data ?? []) as ProfileLight[]
       setProfiles(ps)
       if (ps.length) setSelectedUid(ps[0].id)

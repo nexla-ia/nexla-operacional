@@ -201,7 +201,7 @@ export default function ErrosN8n() {
   async function currentUserName(): Promise<string> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return 'Desconhecido'
-    const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+    const { data } = await supabase.from('nexla_profiles').select('full_name').eq('id', user.id).single()
     return data?.full_name || user.email || 'Desconhecido'
   }
 

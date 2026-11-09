@@ -111,7 +111,7 @@ export default function CRM({ role }: { role?: 'admin' | 'operator' | null }) {
     const uid = auth.user?.id ?? null
 
     const [{ data: pf }, funRes, { data: st }, { data: ld }, { data: tk }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, role'),
+      supabase.from('nexla_profiles').select('id, full_name, role'),
       supabase.from('crm_funnels').select('*').order('posicao'),
       supabase.from('crm_stages').select('*').order('posicao'),
       supabase.from('crm_leads').select('*').order('created_at', { ascending: false }),

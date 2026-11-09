@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react'
 import { UserCog, Loader2, X, Plus, UserPlus, Mail, Shield, Pencil } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { FunctionsHttpError } from '@supabase/supabase-js'
+import { supabase } from '../../lib/supabase'
+
+// Operações administrativas rodam na edge function `nexla-usuarios` (service role
+// fica no servidor). Retorna a mensagem de erro do servidor, quando houver.
+async function callUsuariosFn<T = unknown>(body: Record<string, unknown>): Promise<{ data: T | null; error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('nexla-usuarios', { body })
+  if (!error) return { data: data as T, error: null }
+  if (error instanceof FunctionsHttpError) {
+    const payload = await error.context.json().catch(() => null)
+    return { data: null, error: payload?.error ?? error.message }
+  }
+  return { data: null, error: error.message || 'Erro ao chamar o servidor.' }
+}
 
 interface Profile {
   id:        string
@@ -41,7 +54,7 @@ function EditUserModal({ profile, onSaved, onClose }: {
     if (nome.trim().length < 2) { setError('Nome deve ter ao menos 2 caracteres.'); return }
     setSaving(true)
     const { error: err } = await supabase
-      .from('profiles')
+      .from('nexla_profiles')
       .update({ full_name: nome.trim(), role })
       .eq('id', profile.id)
     if (err) { setError('Erro ao salvar: ' + err.message); setSaving(false); return }
@@ -151,40 +164,24 @@ function NovoUsuarioModal({ onCreated, onClose }: { onCreated: () => void; onClo
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('E-mail inválido.'); return }
     if (senha.length < 6)        { setError('Senha deve ter ao menos 6 caracteres.'); return }
 
-    if (!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
-      setError('Configuração incompleta: VITE_SUPABASE_SERVICE_ROLE_KEY não definida.')
-      return
-    }
-
     setSaving(true)
 
-    const { data, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email: email.trim().toLowerCase(),
-      password: senha,
-      email_confirm: true,
-      user_metadata: { full_name: nome.trim() },
+    const { error: createErr } = await callUsuariosFn({
+      action:    'create',
+      email:     email.trim().toLowerCase(),
+      password:  senha,
+      full_name: nome.trim(),
+      role,
     })
 
-    if (createErr || !data.user) {
-      const msg = createErr?.message ?? ''
+    if (createErr) {
+      const msg = createErr
       if (msg.includes('already registered') || msg.includes('already been registered'))
         setError('Este e-mail já está cadastrado.')
       else if (msg.includes('password'))
         setError('Senha inválida: ' + msg)
-      else if (msg.includes('Database error'))
-        setError('Erro no banco de dados. Verifique se a migration 012 foi executada.')
       else
-        setError(msg || 'Erro ao criar usuário.')
-      setSaving(false)
-      return
-    }
-
-    const { error: profileErr } = await supabaseAdmin
-      .from('profiles')
-      .upsert({ id: data.user.id, full_name: nome.trim(), role }, { onConflict: 'id' })
-
-    if (profileErr) {
-      setError('Usuário criado, mas perfil não salvo: ' + profileErr.message)
+        setError(msg)
       setSaving(false)
       return
     }
@@ -272,7 +269,7 @@ export default function Usuarios() {
 
     // Fetch profiles
     const { data: profileData, error: profileErr } = await supabase
-      .from('profiles')
+      .from('nexla_profiles')
       .select('id,full_name,role')
 
     if (profileErr) { setError('Erro ao carregar usuários.'); setLoading(false); return }
@@ -283,18 +280,10 @@ export default function Usuarios() {
       role:      (p.role as Profile['role']) ?? 'operator',
     }))
 
-    // Try to enrich with emails via admin API
-    try {
-      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 })
-      if (usersData?.users) {
-        const emailMap = new Map(usersData.users.map(u => [u.id, u.email]))
-        setProfiles(base.map(p => ({ ...p, email: emailMap.get(p.id) })))
-      } else {
-        setProfiles(base)
-      }
-    } catch {
-      setProfiles(base)
-    }
+    // Enriquece com e-mails via edge function (só funciona para admins)
+    const { data: emailData } = await callUsuariosFn<{ emails: Record<string, string> }>({ action: 'list_emails' })
+    const emails = emailData?.emails ?? {}
+    setProfiles(base.map(p => ({ ...p, email: emails[p.id] })))
 
     setLoading(false)
   }

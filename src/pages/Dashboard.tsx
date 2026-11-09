@@ -147,8 +147,10 @@ export default function Dashboard() {
         .from('nexla_profiles')
         .select('role')
         .eq('id', data.user.id)
-        .single()
-      const r = (profile?.role as 'admin' | 'operator') ?? 'operator'
+        .maybeSingle()
+      // Conta de outro sistema (auth compartilhado) sem cadastro na Nexla: expulsa.
+      if (!profile) { await signOut(); navigate('/', { replace: true }); return }
+      const r = profile.role as 'admin' | 'operator'
       setRole(r)
       if (r === 'operator') setActiveSection('crm')
     })
@@ -235,6 +237,16 @@ export default function Dashboard() {
       : 'text-slate-300 hover:bg-white/[0.04] hover:text-slate-200'
     }
   `
+
+  // Nada do sistema é renderizado até confirmar que a conta é membro da Nexla
+  // (o auth é compartilhado com outros sistemas).
+  if (!role) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#060709]">
+        <div className="w-6 h-6 rounded-full border-2 border-indigo-400/30 border-t-indigo-400 animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="grain flex h-screen bg-[#060709] overflow-hidden">

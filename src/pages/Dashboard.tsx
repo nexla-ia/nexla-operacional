@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   LogOut, Menu, LayoutGrid, FolderKanban, ChevronDown,
   Users, UserCog, CalendarDays, Receipt, RefreshCw, ArrowDownCircle, MessageCircle,
-  LayoutDashboard, AlertTriangle, Wallet, FileText, Activity, Heart, Lock, Clock, Target, Star,
+  LayoutDashboard, AlertTriangle, Wallet, FileText, Activity, Heart, Lock, Clock, Target, Star, Radar,
   type LucideIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -28,6 +28,7 @@ import DashboardHome from '../components/DashboardHome'
 import CRM from '../components/crm/CRM'
 import ErrosN8n from '../components/ErrosN8n'
 import SushiTime from '../components/SushiTime'
+import RadarEditais from '../components/RadarEditais'
 import Configuracoes from '../components/Configuracoes'
 import type { User } from '@supabase/supabase-js'
 import type { Project, Client } from '../lib/types'
@@ -91,7 +92,7 @@ const NAV: NavItem[] = [
 const SECTION_LABELS: Record<string, string> = {
   dashboard: 'Dashboard', crm: 'CRM de Vendas', projetos: 'Projetos', propostas: 'Propostas', calendario: 'Calendários',
   kanban: 'Kanban', 'erros-n8n': 'Erros N8N', nps: 'NPS', acessos: 'Acessos', ponto: 'Ponto',
-  sushi_time: 'Sushi Time',
+  sushi_time: 'Sushi Time', radar_editais: 'Radar de Editais',
   clientes: 'Clientes', usuarios: 'Usuários',
   'fluxo-caixa': 'Fluxo de Caixa',
   despesas: 'Despesas', mensalidades: 'Mensalidades',
@@ -138,6 +139,7 @@ export default function Dashboard() {
   const [avatarFailed, setAvatarFailed]   = useState(false)
   // Telas restritas a usuários específicos (nexla_tela_acesso)
   const [hasSushi, setHasSushi]           = useState(false)
+  const [hasRadar, setHasRadar]           = useState(false)
   const [activeSection, setActiveSection] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen]     = useState(false)
   const [openGroups, setOpenGroups]       = useState<Set<string>>(new Set())
@@ -160,6 +162,8 @@ export default function Dashboard() {
       setProfileName((profile.full_name as string | null)?.trim() ?? '')
       const { data: sushi } = await supabase.rpc('nexla_tem_tela', { p_tela: 'sushi_time' })
       setHasSushi(sushi === true)
+      const { data: radar } = await supabase.rpc('nexla_tem_tela', { p_tela: 'radar_editais' })
+      setHasRadar(radar === true)
       setRole(r)
       if (r === 'operator') setActiveSection('crm')
     })
@@ -229,10 +233,11 @@ export default function Dashboard() {
     { type: 'leaf', id: 'clientes',   label: 'Clientes',    icon: Users        },
   ]
   const SUSHI_LEAF: NavLeaf = { type: 'leaf', id: 'sushi_time', label: 'Sushi Time', icon: Star }
-  const operatorNav: NavLeaf[] = hasSushi ? [...OPERATOR_NAV, SUSHI_LEAF] : OPERATOR_NAV
-  const visibleNav: NavItem[] = role === 'operator'
-    ? operatorNav
-    : hasSushi ? [...NAV, SUSHI_LEAF] : NAV
+  const RADAR_LEAF: NavLeaf = { type: 'leaf', id: 'radar_editais', label: 'Radar de Editais', icon: Radar }
+  // Telas extras liberadas por usuário (nexla_tela_acesso)
+  const extraNav: NavLeaf[] = [...(hasSushi ? [SUSHI_LEAF] : []), ...(hasRadar ? [RADAR_LEAF] : [])]
+  const operatorNav: NavLeaf[] = [...OPERATOR_NAV, ...extraNav]
+  const visibleNav: NavItem[] = role === 'operator' ? operatorNav : [...NAV, ...extraNav]
 
   // Operador só renderiza o que está no menu dele — sem isso, uma seção antiga
   // no estado (ou um atalho interno) abriria uma tela sem acesso.
@@ -422,6 +427,7 @@ export default function Dashboard() {
             {section === 'entradas'     && <EntradasProjetos />}
             {section === 'erros-n8n'    && <ErrosN8n />}
             {section === 'sushi_time'   && hasSushi && <SushiTime />}
+            {section === 'radar_editais' && hasRadar && <RadarEditais />}
             {section === 'configuracoes' && <Configuracoes />}
           </div>
         </main>

@@ -19,6 +19,8 @@ interface ReviewRequest {
 
 type Filtro = 'todos' | 'sent' | 'pending' | 'skipped'
 
+const AUTO_REFRESH_MS = 30_000
+
 const STATUS: Record<string, { label: string; cls: string }> = {
   sent:    { label: 'Enviada',  cls: 'bg-emerald-500/10 text-emerald-300' },
   pending: { label: 'Pendente', cls: 'bg-amber-500/10 text-amber-200' },
@@ -51,16 +53,28 @@ export default function SushiTime() {
   const [filtro, setFiltro]   = useState<Filtro>('todos')
   const [busca, setBusca]     = useState('')
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  const [refreshing, setRefreshing] = useState(false)
+
+  // silencioso = atualização automática: não troca a tabela pelo spinner
+  const load = useCallback(async (silencioso = false) => {
+    if (silencioso) setRefreshing(true); else setLoading(true)
     const { data, error: err } = await supabase.rpc('nexla_sushi_review_requests')
     if (err) setError(err.code === '42501' ? 'Você não tem acesso a esta tela.' : 'Erro ao carregar: ' + err.message)
-    else setRows((data ?? []) as ReviewRequest[])
+    else { setError(''); setRows((data ?? []) as ReviewRequest[]) }
     setLoading(false)
+    setRefreshing(false)
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Atualização automática a cada 30s; pausa com a aba em segundo plano
+  // e atualiza na hora quando o usuário volta para a aba.
+  useEffect(() => {
+    const timer = setInterval(() => { if (!document.hidden) load(true) }, AUTO_REFRESH_MS)
+    const onVisible = () => { if (!document.hidden) load(true) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible) }
+  }, [load])
 
   const contagem = useMemo(() => ({
     todos:   rows.length,
@@ -92,11 +106,11 @@ export default function SushiTime() {
       <div className="flex items-center justify-between gap-4 mb-5">
         <div>
           <h1 className="text-white text-xl font-semibold">Sushi Time</h1>
-          <p className="text-slate-400 text-sm">Envio das solicitações de avaliação no Google</p>
+          <p className="text-slate-400 text-sm">Envio das solicitações de avaliação no Google · atualiza a cada 30s</p>
         </div>
-        <button onClick={load} disabled={loading}
+        <button onClick={() => load(true)} disabled={loading || refreshing}
           className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-slate-300 text-xs bg-white/[0.04] border border-white/[0.08] hover:border-white/20 disabled:opacity-50">
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+          <RefreshCw className={`w-3.5 h-3.5 ${loading || refreshing ? 'animate-spin' : ''}`} /> Atualizar
         </button>
       </div>
 
